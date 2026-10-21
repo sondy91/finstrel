@@ -4,14 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
+	"sync"
 	"time"
+	"vestramaximus/internal/bankfeed"
 	"vestramaximus/internal/database"
 	"vestramaximus/internal/models"
 )
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx       context.Context
+	bankMu    sync.Mutex
+	bankFeeds *bankfeed.Service
 }
 
 // UpdateBudgetPeriodStatus updates a budget period's status.
@@ -90,10 +95,11 @@ func (a *App) Greet(name string) string {
 func (a *App) AddAccount(name string, accountType string, initialBalance float64) (models.Account, error) {
 	log.Printf("Received AddAccount call: Name=%s, Type=%s, Balance=%.2f", name, accountType, initialBalance)
 	newAccount := models.Account{
-		Name:           name,
-		Type:           accountType,
-		InitialBalance: initialBalance,
-		CurrentBalance: initialBalance, // Current balance starts same as initial
+		Name:              name,
+		Type:              accountType,
+		InitialBalance:    initialBalance,
+		CurrentBalance:    initialBalance, // Current balance starts same as initial
+		IncludeInCashFlow: true,
 	}
 	createdAccount, err := database.AddAccount(newAccount)
 	if err != nil {
@@ -102,6 +108,17 @@ func (a *App) AddAccount(name string, accountType string, initialBalance float64
 		return models.Account{}, fmt.Errorf("failed to add account: %w", err)
 	}
 	return createdAccount, nil
+}
+
+// UpdateAccountCashFlowInclusion marks whether an account is spendable cash for forecasts.
+func (a *App) UpdateAccountCashFlowInclusion(id int64, include bool) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid account ID")
+	}
+	if err := database.UpdateAccountCashFlowInclusion(id, include); err != nil {
+		return fmt.Errorf("failed to update account cash-flow inclusion: %w", err)
+	}
+	return nil
 }
 
 // GetAccounts retrieves all financial accounts.
@@ -134,6 +151,11 @@ func (a *App) DeleteAccount(id int64) error {
 // AddCategory adds a new income or expense category.
 // parentCategoryID can be nil or 0 to indicate a top-level category.
 func (a *App) AddCategory(name string, categoryType string, parentCategoryID *int64) (models.Category, error) {
+	return a.AddCategoryWithDefault(name, categoryType, parentCategoryID, 0)
+}
+
+// AddCategoryWithDefault creates a reusable category template for future periods.
+func (a *App) AddCategoryWithDefault(name string, categoryType string, parentCategoryID *int64, defaultAmount float64) (models.Category, error) {
 	log.Printf("Received AddCategory call: Name=%s, Type=%s, ParentID=%v", name, categoryType, parentCategoryID)
 	// Basic validation
 	if categoryType != "Income" && categoryType != "Expense" {
@@ -142,11 +164,15 @@ func (a *App) AddCategory(name string, categoryType string, parentCategoryID *in
 	if name == "" {
 		return models.Category{}, fmt.Errorf("category name cannot be empty")
 	}
+	if defaultAmount < 0 {
+		return models.Category{}, fmt.Errorf("category default amount cannot be negative")
+	}
 
 	newCategory := models.Category{
 		Name:             name,
 		Type:             categoryType,
 		ParentCategoryID: parentCategoryID, // Pass the pointer directly
+		DefaultAmount:    defaultAmount,
 	}
 
 	createdCategory, err := database.AddCategory(newCategory)
@@ -156,6 +182,50 @@ func (a *App) AddCategory(name string, categoryType string, parentCategoryID *in
 		return models.Category{}, fmt.Errorf("failed to add category: %w", err)
 	}
 	return createdCategory, nil
+}
+
+func (a *App) UpdateCategoryDefaultAmount(id int64, amount float64) error {
+	if id <= 0 || amount < 0 {
+		return fmt.Errorf("invalid category default amount")
+	}
+	if err := database.UpdateCategoryDefaultAmount(id, amount); err != nil {
+		return fmt.Errorf("failed to update category default amount: %w", err)
+	}
+	return nil
+}
+
+func (a *App) UpdateCategory(id int64, name string, categoryType string, parentCategoryID *int64, defaultAmount float64) (models.Category, error) {
+	if id <= 0 || strings.TrimSpace(name) == "" || defaultAmount < 0 {
+		return models.Category{}, fmt.Errorf("invalid category details")
+	}
+	if categoryType != "Income" && categoryType != "Expense" {
+		return models.Category{}, fmt.Errorf("invalid category type: %s", categoryType)
+	}
+	if parentCategoryID != nil && *parentCategoryID == id {
+		return models.Category{}, fmt.Errorf("a category cannot be its own parent")
+	}
+	updated, err := database.UpdateCategory(models.Category{ID: id, Name: name, Type: categoryType, ParentCategoryID: parentCategoryID, DefaultAmount: defaultAmount})
+	if err != nil {
+		return models.Category{}, fmt.Errorf("failed to update category: %w", err)
+	}
+	return updated, nil
+}
+
+// DeleteCategory deletes an income or expense category.
+func (a *App) DeleteCategory(id int64) error {
+	log.Printf("Received DeleteCategory call: ID=%d", id)
+	if id <= 0 {
+		return fmt.Errorf("invalid category ID")
+	}
+	err := database.DeleteCategory(id)
+	if err != nil {
+		log.Printf("Error calling database.DeleteCategory for ID %d: %v", id, err)
+		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
+			return fmt.Errorf("cannot delete category: it is still used by one or more transactions")
+		}
+		return fmt.Errorf("failed to delete category: %w", err)
+	}
+	return nil
 }
 
 // GetCategories retrieves all categories.
@@ -245,6 +315,57 @@ func (a *App) GetTransactions() ([]models.Transaction, error) {
 	return transactions, nil
 }
 
+func (a *App) AddBill(name string, amount float64, categoryID int64, dueDay int, accountID *int64, active bool) (models.Bill, error) {
+	if strings.TrimSpace(name) == "" {
+		return models.Bill{}, fmt.Errorf("bill name cannot be empty")
+	}
+	if amount < 0 || categoryID <= 0 || dueDay < 1 || dueDay > 31 {
+		return models.Bill{}, fmt.Errorf("invalid bill details")
+	}
+	return database.AddBill(models.Bill{Name: name, Amount: amount, CategoryID: categoryID, DueDay: dueDay, AccountID: accountID, Active: active})
+}
+
+func (a *App) GetBills() ([]models.Bill, error) { return database.GetBills() }
+
+func (a *App) UpdateBill(id int64, name string, amount float64, categoryID int64, dueDay int, accountID *int64, active bool) (models.Bill, error) {
+	if id <= 0 || strings.TrimSpace(name) == "" || amount < 0 || categoryID <= 0 || dueDay < 1 || dueDay > 31 {
+		return models.Bill{}, fmt.Errorf("invalid bill details")
+	}
+	return database.UpdateBill(models.Bill{ID: id, Name: name, Amount: amount, CategoryID: categoryID, DueDay: dueDay, AccountID: accountID, Active: active})
+}
+
+func (a *App) DeleteBill(id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("invalid bill ID")
+	}
+	return database.DeleteBill(id)
+}
+
+func (a *App) GetCashFlowSettings() (models.CashFlowSettings, error) {
+	return database.GetCashFlowSettings()
+}
+
+// UpdateCashFlowSettings takes an empty payday to clear it. It is separate from
+// budget periods because a planning period is not inherently a payroll cycle.
+func (a *App) UpdateCashFlowSettings(nextPaycheckDate string, desiredCashBuffer float64) error {
+	if desiredCashBuffer < 0 {
+		return fmt.Errorf("desired cash buffer cannot be negative")
+	}
+	settings := models.CashFlowSettings{DesiredCashBuffer: desiredCashBuffer}
+	if nextPaycheckDate != "" {
+		parsed, err := time.Parse("2006-01-02", nextPaycheckDate)
+		if err != nil {
+			return fmt.Errorf("invalid next paycheck date: %w", err)
+		}
+		settings.NextPaycheckDate = &parsed
+	}
+	return database.UpdateCashFlowSettings(settings)
+}
+
+func (a *App) GetCashFlowSummary() (models.CashFlowSummary, error) {
+	return database.GetCashFlowSummary(time.Now())
+}
+
 // AddBudgetPeriod adds a new budget period.
 // startDateString and endDateString should be in a recognizable format (e.g., RFC3339 or "YYYY-MM-DD").
 func (a *App) AddBudgetPeriod(name string, startDateString string, endDateString string, status string) (models.BudgetPeriod, error) {
@@ -294,6 +415,48 @@ func (a *App) AddBudgetPeriod(name string, startDateString string, endDateString
 		return models.BudgetPeriod{}, fmt.Errorf("failed to add budget period: %w", err)
 	}
 	return createdPeriod, nil
+}
+
+func (a *App) PopulateBudgetPeriodFromDefaults(periodID int64) error {
+	if periodID <= 0 {
+		return fmt.Errorf("invalid budget period ID")
+	}
+	if err := database.PopulateBudgetPeriodFromDefaults(periodID); err != nil {
+		return fmt.Errorf("failed to populate budget period defaults: %w", err)
+	}
+	return nil
+}
+
+// CloseAndCreateBudgetPeriod closes the selected open period and starts a new,
+// editable period from category defaults as one database operation.
+func (a *App) CloseAndCreateBudgetPeriod(previousPeriodID int64, name string, startDateString string, endDateString string) (models.BudgetPeriod, error) {
+	if previousPeriodID <= 0 || strings.TrimSpace(name) == "" {
+		return models.BudgetPeriod{}, fmt.Errorf("invalid next budget period")
+	}
+	start, err := parseBudgetPeriodDate(startDateString)
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	end, err := parseBudgetPeriodDate(endDateString)
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	if !end.After(start) {
+		return models.BudgetPeriod{}, fmt.Errorf("end date must be after start date")
+	}
+	return database.CloseAndAddBudgetPeriod(previousPeriodID, models.BudgetPeriod{Name: name, StartDate: start, EndDate: end, Status: "Open"})
+}
+
+func parseBudgetPeriodDate(value string) (time.Time, error) {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err == nil {
+		return parsed, nil
+	}
+	parsed, err = time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid budget period date: %s", value)
+	}
+	return parsed, nil
 }
 
 // UpdateBudgetPeriod updates an existing budget period.

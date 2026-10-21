@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Steps } from '@/components/ui/steps';
 import { saveOnboardingData } from '@/lib/onboarding';
 
@@ -15,6 +16,7 @@ type OnboardingData = {
   themeMode: 'light' | 'dark';
   goals: string[];
   categories: string[];
+	defaultAmounts: Record<string, number>;
 };
 
 
@@ -32,7 +34,11 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
     themeMode: theme,
     goals: [],
     categories: [],
+    defaultAmounts: {},
   });
+	// Keep amount entry as text so a controlled number input can be cleared
+	// before it is normalized to a safe value on completion.
+	const [defaultAmountDrafts, setDefaultAmountDrafts] = useState<Record<string, string>>({});
 
   const goalOptions = [
     { id: 'debt', label: 'Pay off debt', Icon: CreditCard },
@@ -66,7 +72,15 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
       categories: prev.categories.includes(categoryId)
         ? prev.categories.filter((c) => c !== categoryId)
         : [...prev.categories, categoryId],
+		defaultAmounts: prev.categories.includes(categoryId) ? Object.fromEntries(Object.entries(prev.defaultAmounts).filter(([id]) => id !== categoryId)) : { ...prev.defaultAmounts, [categoryId]: 0 },
     }));
+		setDefaultAmountDrafts(prev => {
+			if (onboardingData.categories.includes(categoryId)) {
+				const { [categoryId]: _removed, ...remaining } = prev;
+				return remaining;
+			}
+			return { ...prev, [categoryId]: '' };
+		});
   };
 
   const steps = [
@@ -74,6 +88,7 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
     { id: 2, label: 'Customize' },
     { id: 3, label: 'Goals' },
     { id: 4, label: 'Categories' },
+	{ id: 5, label: 'Amounts' },
   ];
 
   const canProceed = () => {
@@ -94,7 +109,14 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
       setCurrentStep((prev) => prev + 1);
     } else {
       // Save onboarding data before completing
-      saveOnboardingData(onboardingData);
+		const completedData: OnboardingData = {
+			...onboardingData,
+			defaultAmounts: Object.fromEntries(onboardingData.categories.map(categoryId => {
+				const amount = Number(defaultAmountDrafts[categoryId]);
+				return [categoryId, Number.isFinite(amount) && amount >= 0 ? amount : 0];
+			})),
+		};
+      saveOnboardingData(completedData);
       onGetStarted();
     }
   };
@@ -122,7 +144,7 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
                     Welcome to VestraMaximus
                   </h1>
                   <p className="text-base text-muted-foreground">
-                    Streamline your budgets, track envelopes, and stay in control — all offline.
+                    Plan budgets and track envelopes on your device. Optional bank imports use Plaid.
                   </p>
                 </div>
               )}
@@ -156,6 +178,9 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
                   </p>
                 </div>
               )}
+			  {currentStep === 5 && (
+				<div className="space-y-3"><h1 className="text-3xl font-semibold tracking-tight">Set your usual amounts</h1><p className="text-base text-muted-foreground">These defaults will be used for your first and future budget periods.</p></div>
+			  )}
             </CardHeader>
             <CardContent className="flex flex-col min-h-[420px]">
               <div className="flex-1 flex flex-col items-center justify-center">
@@ -289,6 +314,9 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
                   </div>
                 </div>
               )}
+			  {currentStep === 5 && (
+				<div className="w-full max-w-md space-y-3">{onboardingData.categories.map(categoryId => { const category = starterCategories.find(item => item.id === categoryId); return <label key={categoryId} className="flex items-center justify-between gap-4 rounded-lg border p-3"><span className="font-medium">{category?.label || categoryId}</span><div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">$</span><Input className="w-28" type="number" min="0" step="0.01" placeholder="0" value={defaultAmountDrafts[categoryId] ?? ''} onChange={e => setDefaultAmountDrafts(prev => ({ ...prev, [categoryId]: e.target.value }))} /></div></label>})}<p className="text-xs text-muted-foreground">Leave an amount blank to use $0.</p></div>
+			  )}
               </div>
               <div className="mt-auto pt-6 space-y-4">
                 <div className="flex gap-3 justify-center">
@@ -320,7 +348,7 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
           </Card>
         </main>
         <footer className="mt-10 flex justify-center text-xs text-muted-foreground">
-          <span>Built for focused builders • Fully local • Privacy-first</span>
+          <span>Local budgets • Optional bank imports • Privacy-first</span>
         </footer>
       </div>
     </div>

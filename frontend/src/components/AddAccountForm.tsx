@@ -85,7 +85,7 @@ const AddAccountForm: React.FC<AddAccountFormProps> = ({ onAccountAdded }) => {
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Add New Account</h3>
             </div>
-            
+
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
             {successMessage && <p className="text-sm font-medium text-green-600 dark:text-green-400">{successMessage}</p>}
 
@@ -131,6 +131,8 @@ const AddAccountForm: React.FC<AddAccountFormProps> = ({ onAccountAdded }) => {
                 </div>
             </div>
 
+            <p className="text-xs text-muted-foreground">New accounts are included in spendable cash by default. You can exclude savings from the forecast on the Accounts page.</p>
+
             <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? 'Adding...' : 'Add Account'}
@@ -139,4 +141,4 @@ const AddAccountForm: React.FC<AddAccountFormProps> = ({ onAccountAdded }) => {
     );
 };
 
-export default AddAccountForm; 
+export default AddAccountForm;

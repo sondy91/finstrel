@@ -3,7 +3,7 @@
  * Creates default budget period and categories based on user choices
  */
 
-import { AddBudgetPeriod, AddCategory, AddBudgetAllocation } from '../wailsAdapter';
+import { AddBudgetPeriod, AddCategoryWithDefault } from '../wailsAdapter';
 import type { OnboardingData } from './onboarding';
 
 /**
@@ -47,22 +47,14 @@ function getCurrentMonthDates(): { startDate: string; endDate: string } {
 /**
  * Seed initial budget from onboarding data
  * Creates:
- * 1. Default budget period for current month
- * 2. Categories from wizard selections
- * 3. Budget allocations ($0 initial) for each category
+ * 1. Categories and their reusable default amounts
+ * 2. Default budget period, which atomically copies those defaults
  */
 export async function seedInitialBudget(data: OnboardingData): Promise<void> {
   try {
     console.log('Seeding initial budget from onboarding data:', data);
     
-    // 1. Create default budget period
-    const { startDate, endDate } = getCurrentMonthDates();
-    const periodName = getDefaultPeriodName();
-    
-    const period = await AddBudgetPeriod(periodName, startDate, endDate, 'Open');
-    console.log('Created budget period:', period);
-    
-    // 2. Create categories and allocations
+	// 1. Create category templates before the first period.
     for (const categoryId of data.categories) {
       const categoryName = CATEGORY_MAP[categoryId];
       if (!categoryName) {
@@ -70,18 +62,15 @@ export async function seedInitialBudget(data: OnboardingData): Promise<void> {
         continue;
       }
       
-      // Create category (type: Expense, no parent)
-      const category = await AddCategory(categoryName, 'Expense', null);
+		const defaultAmount = data.defaultAmounts?.[categoryId] ?? 0;
+      const category = await AddCategoryWithDefault(categoryName, 'Expense', null, defaultAmount);
       console.log(`Created category: ${categoryName}`, category);
-      
-      // Create $0 allocation for this category in the budget period
-      const allocation = await AddBudgetAllocation(
-        period.id,
-        category.id,
-        0.00
-      );
-      console.log(`Created allocation for ${categoryName}:`, allocation);
     }
+
+	// 2. New periods copy all saved category defaults.
+	const { startDate, endDate } = getCurrentMonthDates();
+	const period = await AddBudgetPeriod(getDefaultPeriodName(), startDate, endDate, 'Open');
+	console.log('Created populated budget period:', period);
     
     console.log('Initial budget seeding complete');
   } catch (error) {

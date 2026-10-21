@@ -32,6 +32,7 @@ import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { models } from '../../wailsjs/go/models';
 import AddBudgetAllocationForm from '../components/AddBudgetAllocationForm';
+import AddCategoryForm from '../components/AddCategoryForm';
 import AddBudgetPeriodForm from '../components/AddBudgetPeriodForm';
 import BudgetPeriodItem from '../components/BudgetPeriodItem';
 import {
@@ -41,6 +42,8 @@ import {
   GetCategories,
   UpdateBudgetAllocation,
   UpdateBudgetPeriod,
+	PopulateBudgetPeriodFromDefaults,
+	CloseAndCreateBudgetPeriod,
 } from '../wailsAdapter';
 
 const BudgetPage: React.FC = () => {
@@ -59,6 +62,13 @@ const BudgetPage: React.FC = () => {
 
   const [showAddAllocationForm, setShowAddAllocationForm] = useState<boolean>(false);
   const [isCreatePeriodOpen, setIsCreatePeriodOpen] = useState<boolean>(false);
+	const [isHandoffOpen, setIsHandoffOpen] = useState<boolean>(false);
+	const [nextPeriodName, setNextPeriodName] = useState('');
+	const [nextPeriodStart, setNextPeriodStart] = useState('');
+	const [nextPeriodEnd, setNextPeriodEnd] = useState('');
+	const [handoffError, setHandoffError] = useState<string | null>(null);
+	const [isHandingOff, setIsHandingOff] = useState(false);
+	const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState<boolean>(false);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [allocationToDelete, setAllocationToDelete] = useState<number | null>(null);
@@ -116,6 +126,28 @@ const BudgetPage: React.FC = () => {
     setIsCreatePeriodOpen(false);
   };
 
+	const openHandoff = () => {
+		if (!selectedPeriod) return;
+		const currentEnd = new Date(selectedPeriod.endDate);
+		const start = new Date(currentEnd); start.setDate(start.getDate() + 1);
+		const durationDays = Math.max(1, Math.round((currentEnd.getTime() - new Date(selectedPeriod.startDate).getTime()) / 86400000));
+		const end = new Date(start); end.setDate(end.getDate() + durationDays);
+		// Budget dates are shown as local calendar days. Do not serialize through
+		// UTC here or evening offsets can advance the suggested period by one day.
+		const toInputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		setNextPeriodName(''); setNextPeriodStart(toInputDate(start)); setNextPeriodEnd(toInputDate(end)); setHandoffError(null); setIsHandoffOpen(true);
+	};
+
+	const completeHandoff = async () => {
+		if (!selectedPeriod) return;
+		setHandoffError(null); setIsHandingOff(true);
+		try {
+			const next = await CloseAndCreateBudgetPeriod(selectedPeriod.id, nextPeriodName, nextPeriodStart, nextPeriodEnd);
+			await fetchBudgetPeriods(); setSelectedPeriod(next); setIsHandoffOpen(false);
+		} catch (err: any) { setHandoffError(err.message || 'Unable to start the next period'); }
+		finally { setIsHandingOff(false); }
+	};
+
   const handlePeriodSelect = (period: models.BudgetPeriod) => {
     setSelectedPeriod(period);
     setShowAddAllocationForm(false);
@@ -152,10 +184,24 @@ const BudgetPage: React.FC = () => {
     }
   };
 
+	const handleCategoryCreatedFromBudget = () => {
+		fetchCategories();
+		setIsCreateCategoryOpen(false);
+	};
+
+	const populateFromDefaults = async () => {
+		if (!selectedPeriod) return;
+		try { await PopulateBudgetPeriodFromDefaults(selectedPeriod.id); fetchAllocationsForSelectedPeriod(); }
+		catch (err: any) { setAllocationsError(err.message || 'Failed to populate defaults'); }
+	};
+
   const getCategoryName = (categoryId: number): string => {
     const category = categories.find(cat => cat.id === categoryId);
     return category ? category.name : 'Unknown Category';
   };
+
+	const allocationType = (allocation: models.BudgetAllocation) => categories.find(category => category.id === allocation.categoryId)?.type || 'Expense';
+	const displayAllocations = [...allocations].sort((a, b) => allocationType(a).localeCompare(allocationType(b)) || getCategoryName(a.categoryId).localeCompare(getCategoryName(b.categoryId)));
 
   const requestDeleteAllocation = (id: number) => {
     setAllocationToDelete(id);
@@ -291,12 +337,7 @@ const BudgetPage: React.FC = () => {
                   <Edit2 className="h-4 w-4" />
                 </Button>
               </div>
-              {!showAddAllocationForm && (
-                <Button onClick={() => setShowAddAllocationForm(true)} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Envelope
-                </Button>
-              )}
+			  {!showAddAllocationForm && <div className="flex gap-2">{selectedPeriod.status === 'Open' && <Button variant="outline" onClick={openHandoff} size="sm">Start next period</Button>}<Button variant="outline" onClick={populateFromDefaults} size="sm">Populate defaults</Button><Button onClick={() => setShowAddAllocationForm(true)} size="sm"><Plus className="h-4 w-4 mr-2" />Add Envelope</Button></div>}
             </CardHeader>
             <CardContent>
               {isLoadingAllocations && <p className="text-muted-foreground">Loading envelopes...</p>}
@@ -314,6 +355,7 @@ const BudgetPage: React.FC = () => {
                       existingAllocations={allocations}
                       onAllocationModified={handleAllocationModified}
                       allocationToEdit={null}
+					  onCreateCategory={() => setIsCreateCategoryOpen(true)}
                     />
                   )}
                   <Button
@@ -334,7 +376,7 @@ const BudgetPage: React.FC = () => {
                       </Button>
                     </div>
                   )}
-                  {!isLoadingAllocations && !allocationsError && allocations.length > 0 && (
+				  {!isLoadingAllocations && !allocationsError && allocations.length > 0 && (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -344,8 +386,10 @@ const BudgetPage: React.FC = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {allocations.map((alloc) => (
-                          <TableRow key={alloc.id}>
+						{displayAllocations.map((alloc, index) => (
+						  <React.Fragment key={alloc.id}>
+							{index === 0 || allocationType(displayAllocations[index - 1]) !== allocationType(alloc) ? <TableRow className="bg-muted/40 hover:bg-muted/40"><TableCell colSpan={3} className="font-semibold">{allocationType(alloc) === 'Income' ? 'Planned Income' : 'Expense Envelopes'}</TableCell></TableRow> : null}
+						  <TableRow>
                             <TableCell className="font-medium">{getCategoryName(alloc.categoryId)}</TableCell>
                             <TableCell>
                               {editingAllocationId === alloc.id ? (
@@ -380,13 +424,15 @@ const BudgetPage: React.FC = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="text-destructive hover:text-destructive"
+                                aria-label={`Delete ${getCategoryName(alloc.categoryId)} envelope`}
                                 onClick={() => requestDeleteAllocation(alloc.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TableCell>
-                          </TableRow>
-                        ))}
+						  </TableRow>
+						  </React.Fragment>
+						))}
                       </TableBody>
                     </Table>
                   )}
@@ -405,6 +451,22 @@ const BudgetPage: React.FC = () => {
       </div>
 
       {/* Edit Period Dialog */}
+		<Dialog open={isHandoffOpen} onOpenChange={setIsHandoffOpen}>
+		  <DialogContent>
+			<DialogHeader><DialogTitle>Close and start next period</DialogTitle></DialogHeader>
+			<p className="text-sm text-muted-foreground">This closes {selectedPeriod?.name} and creates an editable new period from your category defaults.</p>
+			{handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
+			<div className="space-y-4"><div className="space-y-2"><Label htmlFor="next-period-name">New period name</Label><Input id="next-period-name" value={nextPeriodName} onChange={e => setNextPeriodName(e.target.value)} placeholder="e.g., October Budget" /></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="next-period-start">Start</Label><Input id="next-period-start" type="date" value={nextPeriodStart} onChange={e => setNextPeriodStart(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="next-period-end">End</Label><Input id="next-period-end" type="date" value={nextPeriodEnd} onChange={e => setNextPeriodEnd(e.target.value)} /></div></div><Button onClick={completeHandoff} disabled={isHandingOff || !nextPeriodName || !nextPeriodStart || !nextPeriodEnd} className="w-full">{isHandingOff ? 'Starting…' : 'Close current and start next period'}</Button></div>
+		  </DialogContent>
+		</Dialog>
+
+      <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
+		  <DialogContent>
+			<DialogHeader><DialogTitle>Create a category</DialogTitle></DialogHeader>
+			<AddCategoryForm categories={categories} onCategoryAdded={handleCategoryCreatedFromBudget} />
+		  </DialogContent>
+		</Dialog>
+
       <Dialog open={isEditPeriodOpen} onOpenChange={setIsEditPeriodOpen}>
         <DialogContent>
           <DialogHeader>

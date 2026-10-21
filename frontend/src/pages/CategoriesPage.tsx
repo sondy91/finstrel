@@ -1,5 +1,16 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
@@ -8,11 +19,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { FolderTree, Plus, Tag } from 'lucide-react';
+import { Edit2, FolderTree, Plus, Tag, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { models } from '../../wailsjs/go/models';
 import AddCategoryForm from '../components/AddCategoryForm';
-import { GetCategories } from '../wailsAdapter';
+import { DeleteCategory, GetCategories } from '../wailsAdapter';
 
 type Category = models.Category;
 
@@ -21,6 +32,9 @@ const CategoriesPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
+	const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+    const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     const fetchCategories = useCallback(async () => {
         setIsLoading(true);
@@ -40,9 +54,23 @@ const CategoriesPage: React.FC = () => {
         fetchCategories();
     }, [fetchCategories]);
 
-    const handleCategoryAdded = () => {
+    const handleCategoryAdded = (keepOpen: boolean) => {
         fetchCategories();
-        setShowAddForm(false);
+		if (!keepOpen) { setShowAddForm(false); setCategoryToEdit(null); }
+    };
+
+    const confirmDeleteCategory = async () => {
+        if (!categoryToDelete) return;
+        setDeleteError(null);
+        try {
+            await DeleteCategory(categoryToDelete.id);
+            fetchCategories();
+        } catch (err: any) {
+            console.error("Error deleting category:", err);
+            setDeleteError(err.message || 'Failed to delete category');
+        } finally {
+            setCategoryToDelete(null);
+        }
     };
 
     const getParentCategoryName = (parentId: number | null | undefined): string => {
@@ -60,18 +88,10 @@ const CategoriesPage: React.FC = () => {
                         Manage your income and expense categories.
                     </p>
                 </div>
-                <Button onClick={() => setShowAddForm(!showAddForm)}>
-                    {showAddForm ? 'Cancel' : <><Plus className="mr-2 h-4 w-4" /> Add Category</>}
+                <Button onClick={() => { setCategoryToEdit(null); setShowAddForm(true); }}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Category
                 </Button>
             </div>
-
-            {showAddForm && (
-                <Card className="mb-8 border-primary/20 bg-primary/5">
-                    <CardContent className="pt-6">
-                        <AddCategoryForm onCategoryAdded={handleCategoryAdded} categories={categories} />
-                    </CardContent>
-                </Card>
-            )}
 
             <Card>
                 <CardHeader>
@@ -80,12 +100,13 @@ const CategoriesPage: React.FC = () => {
                 <CardContent>
                     {isLoading && <p className="text-muted-foreground">Loading categories...</p>}
                     {error && <p className="text-destructive">Error: {error}</p>}
+                    {deleteError && <p className="text-destructive">Error: {deleteError}</p>}
 
-                    {!isLoading && !error && categories.length === 0 && !showAddForm && (
+                    {!isLoading && !error && categories.length === 0 && (
                         <div className="text-center py-12">
                             <Tag className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
                             <p className="text-muted-foreground mb-4">No categories found.</p>
-                            <Button onClick={() => setShowAddForm(true)} variant="outline">
+                            <Button onClick={() => { setCategoryToEdit(null); setShowAddForm(true); }} variant="outline">
                                 Create your first category
                             </Button>
                         </div>
@@ -98,6 +119,8 @@ const CategoriesPage: React.FC = () => {
                                     <TableHead>Name</TableHead>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Parent Category</TableHead>
+                                    <TableHead>Default per Period</TableHead>
+                                    <TableHead className="w-10"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -124,6 +147,20 @@ const CategoriesPage: React.FC = () => {
                                                 <span className="text-muted-foreground">-</span>
                                             )}
                                         </TableCell>
+                                        <TableCell>
+										${category.defaultAmount.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell>
+										<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => { setCategoryToEdit(category); setShowAddForm(true); }} aria-label={`Edit ${category.name}`}><Edit2 className="h-4 w-4" /></Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                onClick={() => setCategoryToDelete(category)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -131,8 +168,34 @@ const CategoriesPage: React.FC = () => {
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>{categoryToEdit ? 'Edit category' : 'Create a category'}</DialogTitle></DialogHeader>
+                    <AddCategoryForm onCategoryAdded={handleCategoryAdded} categories={categories} categoryToEdit={categoryToEdit} />
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={!!categoryToDelete} onOpenChange={(open) => !open && setCategoryToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the category <strong>{categoryToDelete?.name}</strong>.
+                            Any sub-categories will become top-level categories, and any budget allocations
+                            for it will be removed. Categories still used by transactions cannot be deleted.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDeleteCategory} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Delete Category
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };
 
-export default CategoriesPage; 
+export default CategoriesPage;

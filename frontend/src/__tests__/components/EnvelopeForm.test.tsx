@@ -31,7 +31,7 @@ describe('EnvelopeForm', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('validates empty fields', async () => {
@@ -42,18 +42,24 @@ describe('EnvelopeForm', () => {
     expect(await screen.findByText(/Please fill in all fields/i)).toBeInTheDocument();
   });
 
-  it('validates amount must be > 0', async () => {
-    setup();
+  it.each(['0', '-1'])('blocks non-positive amount %s before creation', async (value) => {
+    const { onClose, onEnvelopeCreated } = setup();
 
     await userEvent.type(screen.getByLabelText(/Envelope Name/i), 'Food');
     await userEvent.click(screen.getByLabelText(/Category/i));
     // Select first category by option name
     await userEvent.click(await screen.findByRole('option', { name: 'Groceries' }));
-    await userEvent.type(screen.getByLabelText(/Budgeted Amount/i), '0');
+    const amount = screen.getByRole('spinbutton', { name: /Budgeted Amount/i });
+    await userEvent.type(amount, value);
 
     await userEvent.click(screen.getByRole('button', { name: /Create Envelope/i }));
 
-    expect(await screen.findByText(/Please enter a valid amount/i)).toBeInTheDocument();
+    expect(amount).toBeInvalid();
+    expect((amount as HTMLInputElement).validity.rangeUnderflow).toBe(true);
+    expect(Adapter.CreateEnvelope).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onEnvelopeCreated).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('submits successfully and calls callbacks', async () => {

@@ -11,6 +11,7 @@ export type OnboardingData = {
   themeMode: 'light' | 'dark';
   goals: string[];
   categories: string[];
+	defaultAmounts: Record<string, number>;
 };
 
 /**

@@ -1,5 +1,5 @@
-import { AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { useTheme } from '@/components/theme/ThemeProvider';
 import {
@@ -17,13 +17,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { clearBudgetSeeded, clearOnboardingData } from '@/lib/onboarding';
-import { ClearAllData } from '@/wailsAdapter';
+import { AddBill, ClearAllData, DeleteBill, GetBills, GetCashFlowSettings, GetCategories, UpdateBill, UpdateCashFlowSettings } from '@/wailsAdapter';
+import { models } from '../../wailsjs/go/models';
 
 export default function SettingsPage() {
   const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [payday, setPayday] = useState('');
+  const [buffer, setBuffer] = useState('0');
+  const [cashFlowMessage, setCashFlowMessage] = useState('');
+  const [bills, setBills] = useState<models.Bill[]>([]);
+  const [categories, setCategories] = useState<models.Category[]>([]);
+  const [billName, setBillName] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [billCategory, setBillCategory] = useState('');
+  const [billDueDay, setBillDueDay] = useState('');
+  const [editingBill, setEditingBill] = useState<models.Bill | null>(null);
+
+  const loadCashFlow = async () => {
+    const [settings, loadedBills, loadedCategories] = await Promise.all([GetCashFlowSettings(), GetBills(), GetCategories()]);
+    setPayday(settings?.nextPaycheckDate ? String(settings.nextPaycheckDate).slice(0, 10) : '');
+    setBuffer(String(settings?.desiredCashBuffer || 0)); setBills(loadedBills || []);
+    setCategories((loadedCategories || []).filter((c: models.Category) => c.type === 'Expense'));
+  };
+  useEffect(() => { loadCashFlow().catch(error => console.error('Failed to load cash-flow settings:', error)); }, []);
+
+  const saveCashFlow = async () => {
+    try { await UpdateCashFlowSettings(payday, Number(buffer) || 0); setCashFlowMessage('Forecast settings saved.'); }
+    catch (error) { console.error(error); setCashFlowMessage('Unable to save forecast settings.'); }
+  };
+  const addBill = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!billName.trim() || !billCategory || !billDueDay || Number(billAmount) < 0) return;
+    if (editingBill) await UpdateBill(editingBill.id, billName, Number(billAmount), Number(billCategory), Number(billDueDay), editingBill.accountId || null, editingBill.active);
+    else await AddBill(billName, Number(billAmount), Number(billCategory), Number(billDueDay), null, true);
+    setBillName(''); setBillAmount(''); setBillCategory(''); setBillDueDay(''); setEditingBill(null); await loadCashFlow();
+  };
+  const updateBill = async (bill: models.Bill, active: boolean) => { await UpdateBill(bill.id, bill.name, bill.amount, bill.categoryId, bill.dueDay, bill.accountId || null, active); await loadCashFlow(); };
 
   const accentColors = [
     { id: 'indigo', name: 'Indigo', hex: '#6366f1' },
@@ -66,6 +98,22 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        <Card>
+          <CardHeader><CardTitle>Paycheck forecast</CardTitle><CardDescription>These settings are independent from your budget periods.</CardDescription></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="payday">Next paycheck date</Label><Input id="payday" type="date" value={payday} onChange={e => setPayday(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="buffer">Desired cash buffer</Label><Input id="buffer" type="number" min="0" step="0.01" value={buffer} onChange={e => setBuffer(e.target.value)} /></div></div>
+            <Button onClick={saveCashFlow}>Save forecast settings</Button>{cashFlowMessage && <span className="ml-3 text-sm text-muted-foreground">{cashFlowMessage}</span>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Scheduled bills</CardTitle><CardDescription>Expected obligations only. Recording a bill payment still requires a normal transaction.</CardDescription></CardHeader>
+          <CardContent className="space-y-5">
+            <form onSubmit={addBill} className="grid gap-3 md:grid-cols-5"><Input placeholder="Bill name" value={billName} onChange={e => setBillName(e.target.value)} /><Input type="number" min="0" step="0.01" placeholder="Amount" value={billAmount} onChange={e => setBillAmount(e.target.value)} /><select className="h-10 rounded-md border bg-background px-3 text-sm" value={billCategory} onChange={e => setBillCategory(e.target.value)}><option value="">Expense category</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><Input type="number" min="1" max="31" placeholder="Due day" value={billDueDay} onChange={e => setBillDueDay(e.target.value)} /><div className="flex gap-2"><Button type="submit">{editingBill ? 'Save bill' : 'Add bill'}</Button>{editingBill && <Button type="button" variant="outline" onClick={() => { setEditingBill(null); setBillName(''); setBillAmount(''); setBillCategory(''); setBillDueDay(''); }}>Cancel</Button>}</div></form>
+            <div className="space-y-2">{bills.length === 0 ? <p className="text-sm text-muted-foreground">No scheduled bills yet.</p> : bills.map(bill => <div key={bill.id} className="flex items-center justify-between rounded border p-3"><div><p className="font-medium">{bill.name} · ${bill.amount.toFixed(2)}</p><p className="text-xs text-muted-foreground">Due on day {bill.dueDay} · {categories.find(c => c.id === bill.categoryId)?.name || 'Expense'}</p></div><div className="flex items-center gap-3"><label className="text-sm"><input type="checkbox" checked={bill.active} onChange={e => updateBill(bill, e.target.checked)} /> Active</label><Button variant="ghost" size="icon" onClick={() => { setEditingBill(bill); setBillName(bill.name); setBillAmount(String(bill.amount)); setBillCategory(String(bill.categoryId)); setBillDueDay(String(bill.dueDay)); }} aria-label={`Edit ${bill.name}`}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" onClick={async () => { await DeleteBill(bill.id); await loadCashFlow(); }} aria-label={`Delete ${bill.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div>)}</div>
+          </CardContent>
+        </Card>
+
         {/* Appearance Section */}
         <Card>
           <CardHeader>
@@ -133,10 +181,10 @@ export default function SettingsPage() {
           <CardContent>
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-destructive mb-2">Clear All Data</h3>
+                <h3 className="font-semibold text-destructive mb-2">Clear Manual Budget Data</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Permanently delete all accounts, categories, transactions, budgets, and settings.
-                  This action cannot be undone and will restart the onboarding wizard.
+                  Permanently delete manually tracked accounts, categories, transactions, budgets, and settings.
+                  This action cannot be undone and will restart the onboarding wizard. Manage connected banks and remove imported bank data with Disconnect on the Accounts page.
                 </p>
                 <Button
                   variant="destructive"
@@ -144,7 +192,7 @@ export default function SettingsPage() {
                   className="font-semibold"
                 >
                   <AlertTriangle className="mr-2 h-4 w-4" />
-                  Clear All Data
+                  Clear Manual Budget Data
                 </Button>
               </div>
             </div>
@@ -161,7 +209,7 @@ export default function SettingsPage() {
               <strong className="text-foreground">VestraMaximus</strong> - Local-first envelope budgeting
             </p>
             <p>Privacy-focused personal finance management</p>
-            <p className="text-xs">All data stored locally on your device</p>
+            <p className="text-xs">Budgets are stored on your device. Optional bank imports retrieve data through Plaid.</p>
           </CardContent>
         </Card>
       </div>
@@ -176,14 +224,15 @@ export default function SettingsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-4">
               <p className="font-semibold text-foreground">
-                This will permanently delete ALL of your data including:
+                This will permanently delete your manual budget data including:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>All financial accounts</li>
+                <li>All manually tracked financial accounts</li>
                 <li>All categories and transactions</li>
                 <li>All budget periods and allocations</li>
                 <li>All settings and preferences</li>
               </ul>
+              <p>Bank connections and imported bank data are managed separately with Disconnect on the Accounts page.</p>
               <p className="text-destructive font-semibold">
                 This action cannot be undone. You will need to complete the onboarding wizard again.
               </p>
@@ -217,7 +266,7 @@ export default function SettingsPage() {
               disabled={confirmText !== 'DELETE' || isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? 'Deleting...' : 'Delete Everything'}
+              {isDeleting ? 'Deleting...' : 'Delete Manual Budget Data'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

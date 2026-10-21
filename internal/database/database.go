@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"vestramaximus/internal/models" // Add models import
@@ -86,8 +87,31 @@ func createTables() error {
 		type TEXT NOT NULL,
 		initial_balance REAL NOT NULL DEFAULT 0,
 		current_balance REAL NOT NULL DEFAULT 0,
+		include_in_cash_flow INTEGER NOT NULL DEFAULT 1,
 		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	billsTableSQL := `
+	CREATE TABLE IF NOT EXISTS bills (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		amount REAL NOT NULL CHECK(amount >= 0),
+		category_id INTEGER NOT NULL,
+		due_day INTEGER NOT NULL CHECK(due_day BETWEEN 1 AND 31),
+		account_id INTEGER,
+		active INTEGER NOT NULL DEFAULT 1,
+		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+		updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (category_id) REFERENCES categories(id),
+		FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE SET NULL
+	);`
+
+	cashFlowSettingsTableSQL := `
+	CREATE TABLE IF NOT EXISTS cash_flow_settings (
+		id INTEGER PRIMARY KEY CHECK(id = 1),
+		next_paycheck_date TEXT,
+		desired_cash_buffer REAL NOT NULL DEFAULT 0
 	);`
 
 	categoriesTableSQL := `
@@ -96,6 +120,7 @@ func createTables() error {
 		name TEXT NOT NULL UNIQUE,
 		type TEXT NOT NULL, -- 'Income' or 'Expense'
 		parent_category_id INTEGER, -- Nullable
+		default_amount REAL NOT NULL DEFAULT 0,
 		created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (parent_category_id) REFERENCES categories(id) ON DELETE SET NULL -- Allow deleting parent category
@@ -165,6 +190,11 @@ func createTables() error {
 	BEGIN
 		UPDATE envelopes SET updated_at = datetime('now') WHERE id = NEW.id;
 	END;`
+	triggerBillsSQL := `
+	CREATE TRIGGER IF NOT EXISTS update_bills_updated_at
+	AFTER UPDATE ON bills FOR EACH ROW BEGIN
+		UPDATE bills SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+	END;`
 
 	// Trigger to update `updated_at` timestamp (Example for accounts table)
 	// Similar triggers can be added for other tables if needed.
@@ -207,6 +237,8 @@ func createTables() error {
 	// Combine all SQL statements to execute
 	statements := []string{
 		accountsTableSQL,
+		billsTableSQL,
+		cashFlowSettingsTableSQL,
 		categoriesTableSQL,
 		transactionsTableSQL,
 		budgetPeriodsTableSQL,
@@ -218,6 +250,7 @@ func createTables() error {
 		triggerBudgetPeriodsSQL,
 		triggerBudgetAllocationsSQL,
 		triggerEnvelopesSQL,
+		triggerBillsSQL,
 	}
 
 	tx, err := db.Begin()
@@ -235,6 +268,17 @@ func createTables() error {
 		}
 	}
 
+	// Additive, idempotent migrations preserve existing local data.
+	for _, migration := range []string{
+		"ALTER TABLE accounts ADD COLUMN include_in_cash_flow INTEGER NOT NULL DEFAULT 1",
+		"ALTER TABLE categories ADD COLUMN default_amount REAL NOT NULL DEFAULT 0",
+	} {
+		if _, err = tx.Exec(migration); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			tx.Rollback()
+			return fmt.Errorf("apply schema migration: %w", err)
+		}
+	}
+
 	err = tx.Commit()
 	if err != nil {
 		log.Printf("Error committing transaction for table creation: %v", err)
@@ -248,14 +292,14 @@ func createTables() error {
 // AddAccount inserts a new account into the database.
 func AddAccount(account models.Account) (models.Account, error) {
 	db := GetDB()
-	stmt, err := db.Prepare("INSERT INTO accounts(name, type, initial_balance, current_balance) VALUES(?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO accounts(name, type, initial_balance, current_balance, include_in_cash_flow) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Error preparing add account statement: %v", err)
 		return models.Account{}, err
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(account.Name, account.Type, account.InitialBalance, account.CurrentBalance)
+	res, err := stmt.Exec(account.Name, account.Type, account.InitialBalance, account.CurrentBalance, account.IncludeInCashFlow)
 	if err != nil {
 		log.Printf("Error executing add account statement: %v", err)
 		return models.Account{}, err
@@ -274,7 +318,7 @@ func AddAccount(account models.Account) (models.Account, error) {
 // GetAccounts retrieves all accounts from the database.
 func GetAccounts() ([]models.Account, error) {
 	db := GetDB()
-	rows, err := db.Query("SELECT id, name, type, initial_balance, current_balance FROM accounts ORDER BY id ASC")
+	rows, err := db.Query("SELECT id, name, type, initial_balance, current_balance, include_in_cash_flow FROM accounts ORDER BY id ASC")
 	if err != nil {
 		log.Printf("Error querying accounts: %v", err)
 		return nil, err
@@ -285,7 +329,7 @@ func GetAccounts() ([]models.Account, error) {
 	for rows.Next() {
 		var acc models.Account
 		// Note: We are not scanning created_at/updated_at yet
-		if err := rows.Scan(&acc.ID, &acc.Name, &acc.Type, &acc.InitialBalance, &acc.CurrentBalance); err != nil {
+		if err := rows.Scan(&acc.ID, &acc.Name, &acc.Type, &acc.InitialBalance, &acc.CurrentBalance, &acc.IncludeInCashFlow); err != nil {
 			log.Printf("Error scanning account row: %v", err)
 			return nil, err
 		}
@@ -342,14 +386,14 @@ func AddCategory(category models.Category) (models.Category, error) {
 		parentID = sql.NullInt64{Valid: false}
 	}
 
-	stmt, err := db.Prepare("INSERT INTO categories(name, type, parent_category_id) VALUES(?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO categories(name, type, parent_category_id, default_amount) VALUES(?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Error preparing add category statement: %v", err)
 		return models.Category{}, err
 	}
 	defer stmt.Close()
 
-	res, err := stmt.Exec(category.Name, category.Type, parentID)
+	res, err := stmt.Exec(category.Name, category.Type, parentID, category.DefaultAmount)
 	if err != nil {
 		log.Printf("Error executing add category statement: %v", err)
 		// Consider checking for unique constraint violation here if needed
@@ -370,7 +414,7 @@ func AddCategory(category models.Category) (models.Category, error) {
 func GetCategories() ([]models.Category, error) {
 	db := GetDB()
 	// Query includes parent_category_id which can be NULL
-	rows, err := db.Query("SELECT id, name, type, parent_category_id FROM categories ORDER BY id ASC")
+	rows, err := db.Query("SELECT id, name, type, parent_category_id, default_amount FROM categories ORDER BY id ASC")
 	if err != nil {
 		log.Printf("Error querying categories: %v", err)
 		return nil, err
@@ -383,7 +427,7 @@ func GetCategories() ([]models.Category, error) {
 		var parentID sql.NullInt64 // Use sql.NullInt64 for nullable parent_category_id
 
 		// Note: We are not scanning created_at/updated_at yet
-		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Type, &parentID); err != nil {
+		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Type, &parentID, &cat.DefaultAmount); err != nil {
 			log.Printf("Error scanning category row: %v", err)
 			return nil, err
 		}
@@ -407,7 +451,70 @@ func GetCategories() ([]models.Category, error) {
 	return categories, nil
 }
 
-// // TODO: Add functions for UpdateCategory, DeleteCategory, GetCategoryByID later
+// UpdateCategoryDefaultAmount changes only the reusable template. Existing
+// budget periods deliberately retain their independently edited allocations.
+func UpdateCategoryDefaultAmount(id int64, amount float64) error {
+	res, err := GetDB().Exec("UPDATE categories SET default_amount = ? WHERE id = ?", amount, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// UpdateCategory updates the reusable category definition. Period allocations
+// retain their amounts because they reference the category by ID.
+func UpdateCategory(category models.Category) (models.Category, error) {
+	var parentID any
+	if category.ParentCategoryID != nil {
+		parentID = *category.ParentCategoryID
+	}
+	res, err := GetDB().Exec(`UPDATE categories
+		SET name = ?, type = ?, parent_category_id = ?, default_amount = ? WHERE id = ?`,
+		category.Name, category.Type, parentID, category.DefaultAmount, category.ID)
+	if err != nil {
+		return models.Category{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return models.Category{}, sql.ErrNoRows
+	}
+	return category, nil
+}
+
+// DeleteCategory deletes a category by its ID.
+// Child categories have their parent_category_id set to NULL, and budget
+// allocations/envelopes for this category are cascade-deleted (per schema).
+// Deletion fails if any transactions still reference this category.
+func DeleteCategory(id int64) error {
+	db := GetDB()
+	stmt, err := db.Prepare("DELETE FROM categories WHERE id = ?")
+	if err != nil {
+		log.Printf("Error preparing delete category statement: %v", err)
+		return err
+	}
+	defer stmt.Close()
+
+	res, err := stmt.Exec(id)
+	if err != nil {
+		log.Printf("Error executing delete category statement for ID %d: %v", id, err)
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		log.Printf("Error getting rows affected for delete category ID %d: %v", id, err)
+	}
+	if rowsAffected == 0 {
+		log.Printf("No category found with ID %d to delete.", id)
+	}
+
+	log.Printf("Category ID %d deleted successfully.", id)
+	return nil
+}
+
+// // TODO: Add functions for UpdateCategory, GetCategoryByID later
 
 // AddTransaction inserts a new transaction and updates the corresponding account balance.
 // It uses a database transaction to ensure atomicity.
@@ -561,7 +668,12 @@ func AddBudgetPeriod(period models.BudgetPeriod) (models.BudgetPeriod, error) {
 	startDateStr := period.StartDate.UTC().Format("2006-01-02 15:04:05")
 	endDateStr := period.EndDate.UTC().Format("2006-01-02 15:04:05")
 
-	stmt, err := db.Prepare("INSERT INTO budget_periods(name, start_date, end_date, status) VALUES(?, ?, ?, ?)")
+	tx, err := db.Begin()
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare("INSERT INTO budget_periods(name, start_date, end_date, status) VALUES(?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Error preparing add budget period statement: %v", err)
 		return models.BudgetPeriod{}, err
@@ -582,10 +694,87 @@ func AddBudgetPeriod(period models.BudgetPeriod) (models.BudgetPeriod, error) {
 		return models.BudgetPeriod{}, err
 	}
 	period.ID = id
+	if err := populateBudgetPeriodFromDefaults(tx, period.ID); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return models.BudgetPeriod{}, err
+	}
 	// CreatedAt and UpdatedAt are set by the database, so we don't need to fetch them back here
 	// unless they are immediately needed. For now, returning the ID is sufficient.
 	log.Printf("Budget period added successfully with ID: %d", id)
 	return period, nil
+}
+
+// CloseAndAddBudgetPeriod makes the handoff atomic: the current period remains
+// open if the next period or its copied defaults cannot be created.
+func CloseAndAddBudgetPeriod(previousPeriodID int64, period models.BudgetPeriod) (models.BudgetPeriod, error) {
+	tx, err := GetDB().Begin()
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	defer tx.Rollback()
+	var status string
+	if err := tx.QueryRow("SELECT status FROM budget_periods WHERE id = ?", previousPeriodID).Scan(&status); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	if status != "Open" {
+		return models.BudgetPeriod{}, fmt.Errorf("budget period is not open")
+	}
+	var allocationCount int
+	if err := tx.QueryRow("SELECT COUNT(1) FROM budget_allocations WHERE budget_period_id = ?", previousPeriodID).Scan(&allocationCount); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	if allocationCount == 0 {
+		return models.BudgetPeriod{}, fmt.Errorf("budget period must have at least one allocation before closing")
+	}
+	if _, err := tx.Exec("UPDATE budget_periods SET status = 'Closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", previousPeriodID); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+
+	res, err := tx.Exec("INSERT INTO budget_periods(name, start_date, end_date, status) VALUES(?, ?, ?, 'Open')", period.Name, period.StartDate.UTC().Format("2006-01-02 15:04:05"), period.EndDate.UTC().Format("2006-01-02 15:04:05"))
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	period.ID, err = res.LastInsertId()
+	if err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	period.Status = "Open"
+	if err := populateBudgetPeriodFromDefaults(tx, period.ID); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return models.BudgetPeriod{}, err
+	}
+	return period, nil
+}
+
+// PopulateBudgetPeriodFromDefaults fills only missing allocations, making it
+// safe to offer for an existing empty or partially configured period.
+func PopulateBudgetPeriodFromDefaults(budgetPeriodID int64) error {
+	tx, err := GetDB().Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := populateBudgetPeriodFromDefaults(tx, budgetPeriodID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func populateBudgetPeriodFromDefaults(tx *sql.Tx, budgetPeriodID int64) error {
+	result, err := tx.Exec(`INSERT INTO budget_allocations(budget_period_id, category_id, allocated_amount)
+		SELECT ?, c.id, c.default_amount FROM categories c
+		WHERE NOT EXISTS (
+			SELECT 1 FROM budget_allocations ba WHERE ba.budget_period_id = ? AND ba.category_id = c.id
+		)`, budgetPeriodID, budgetPeriodID)
+	if err != nil {
+		return err
+	}
+	_, _ = result.RowsAffected()
+	return nil
 }
 
 // GetBudgetPeriods retrieves all budget periods from the database, ordered by ID.
@@ -828,6 +1017,186 @@ func DeleteBudgetAllocation(id int64) error {
 	return nil
 }
 
+// UpdateAccountCashFlowInclusion keeps savings and other non-spendable balances
+// out of the paycheck forecast without changing their tracked balance.
+func UpdateAccountCashFlowInclusion(id int64, include bool) error {
+	res, err := GetDB().Exec("UPDATE accounts SET include_in_cash_flow = ? WHERE id = ?", include, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func AddBill(bill models.Bill) (models.Bill, error) {
+	res, err := GetDB().Exec(`INSERT INTO bills(name, amount, category_id, due_day, account_id, active)
+		VALUES(?, ?, ?, ?, ?, ?)`, bill.Name, bill.Amount, bill.CategoryID, bill.DueDay, bill.AccountID, bill.Active)
+	if err != nil {
+		return models.Bill{}, err
+	}
+	bill.ID, err = res.LastInsertId()
+	return bill, err
+}
+
+func GetBills() ([]models.Bill, error) {
+	rows, err := GetDB().Query("SELECT id, name, amount, category_id, due_day, account_id, active FROM bills ORDER BY due_day, name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var bills []models.Bill
+	for rows.Next() {
+		var bill models.Bill
+		var accountID sql.NullInt64
+		if err := rows.Scan(&bill.ID, &bill.Name, &bill.Amount, &bill.CategoryID, &bill.DueDay, &accountID, &bill.Active); err != nil {
+			return nil, err
+		}
+		if accountID.Valid {
+			bill.AccountID = &accountID.Int64
+		}
+		bills = append(bills, bill)
+	}
+	return bills, rows.Err()
+}
+
+func UpdateBill(bill models.Bill) (models.Bill, error) {
+	res, err := GetDB().Exec(`UPDATE bills SET name=?, amount=?, category_id=?, due_day=?, account_id=?, active=? WHERE id=?`,
+		bill.Name, bill.Amount, bill.CategoryID, bill.DueDay, bill.AccountID, bill.Active, bill.ID)
+	if err != nil {
+		return models.Bill{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return models.Bill{}, sql.ErrNoRows
+	}
+	return bill, nil
+}
+
+func DeleteBill(id int64) error {
+	_, err := GetDB().Exec("DELETE FROM bills WHERE id = ?", id)
+	return err
+}
+
+func GetCashFlowSettings() (models.CashFlowSettings, error) {
+	var date sql.NullString
+	settings := models.CashFlowSettings{}
+	err := GetDB().QueryRow("SELECT next_paycheck_date, desired_cash_buffer FROM cash_flow_settings WHERE id = 1").Scan(&date, &settings.DesiredCashBuffer)
+	if err == sql.ErrNoRows {
+		return settings, nil
+	}
+	if err != nil {
+		return settings, err
+	}
+	if date.Valid {
+		parsed, err := time.Parse("2006-01-02", date.String)
+		if err != nil {
+			return settings, err
+		}
+		settings.NextPaycheckDate = &parsed
+	}
+	return settings, nil
+}
+
+func UpdateCashFlowSettings(settings models.CashFlowSettings) error {
+	var date any
+	if settings.NextPaycheckDate != nil {
+		date = settings.NextPaycheckDate.Format("2006-01-02")
+	}
+	_, err := GetDB().Exec(`INSERT INTO cash_flow_settings(id, next_paycheck_date, desired_cash_buffer) VALUES(1, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET next_paycheck_date=excluded.next_paycheck_date, desired_cash_buffer=excluded.desired_cash_buffer`, date, settings.DesiredCashBuffer)
+	return err
+}
+
+// GetCashFlowSummary centralizes the forecast so the UI never has to recreate
+// financial rules. Actual transactions affect account balances; bills only model
+// future obligations until a user records the real transaction.
+func GetCashFlowSummary(now time.Time) (models.CashFlowSummary, error) {
+	settings, err := GetCashFlowSettings()
+	if err != nil {
+		return models.CashFlowSummary{}, err
+	}
+	summary := models.CashFlowSummary{DesiredCashBuffer: settings.DesiredCashBuffer, NextPaycheckDate: settings.NextPaycheckDate}
+	if err := GetDB().QueryRow("SELECT COALESCE(SUM(current_balance), 0) FROM accounts WHERE include_in_cash_flow = 1").Scan(&summary.CashAvailable); err != nil {
+		return summary, err
+	}
+	if settings.NextPaycheckDate == nil {
+		summary.ProjectedBalance = summary.CashAvailable
+		summary.SafeToSpend = summary.ProjectedBalance - summary.DesiredCashBuffer
+		summary.Status = "Needs payday"
+		return summary, nil
+	}
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	payday := time.Date(settings.NextPaycheckDate.Year(), settings.NextPaycheckDate.Month(), settings.NextPaycheckDate.Day(), 0, 0, 0, 0, time.UTC)
+	if payday.Before(today) {
+		summary.Status = "Payday overdue"
+		summary.ProjectedBalance = summary.CashAvailable
+		summary.SafeToSpend = summary.ProjectedBalance - summary.DesiredCashBuffer
+		return summary, nil
+	}
+
+	bills, err := GetBills()
+	if err != nil {
+		return summary, err
+	}
+	for _, bill := range bills {
+		if !bill.Active {
+			continue
+		}
+		for month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC); !month.After(payday); month = month.AddDate(0, 1, 0) {
+			lastDay := month.AddDate(0, 1, -1).Day()
+			due := time.Date(month.Year(), month.Month(), min(bill.DueDay, lastDay), 0, 0, 0, 0, time.UTC)
+			if !due.Before(today) && !due.After(payday) {
+				summary.UpcomingBills += bill.Amount
+			}
+		}
+	}
+
+	// Use only the current open budget period. Budget periods remain planning
+	// constructs and do not define the payday window.
+	var periodID int64
+	var start, end string
+	err = GetDB().QueryRow(`SELECT id, start_date, end_date FROM budget_periods
+		WHERE status = 'Open' ORDER BY start_date DESC, id DESC LIMIT 1`).Scan(&periodID, &start, &end)
+	if err != nil && err != sql.ErrNoRows {
+		return summary, err
+	}
+	if err == nil {
+		var remaining float64
+		err = GetDB().QueryRow(`SELECT COALESCE(SUM(MAX(ba.allocated_amount - COALESCE(spent.amount, 0), 0)), 0)
+			FROM budget_allocations ba
+			JOIN categories c ON c.id = ba.category_id AND c.type = 'Expense'
+			LEFT JOIN (
+				SELECT category_id, SUM(ABS(amount)) amount FROM transactions
+				WHERE type = 'Expense' AND date >= ? AND date <= ? GROUP BY category_id
+			) spent ON spent.category_id = ba.category_id
+			WHERE ba.budget_period_id = ?`, start, end, periodID).Scan(&remaining)
+		if err != nil {
+			return summary, err
+		}
+		summary.FlexibleSpendingRemaining = remaining
+	}
+	summary.ProjectedBalance = summary.CashAvailable + summary.IncomeBeforeNextPaycheck - summary.UpcomingBills - summary.FlexibleSpendingRemaining
+	summary.SafeToSpend = summary.ProjectedBalance - summary.DesiredCashBuffer
+	switch {
+	case summary.ProjectedBalance < 0:
+		summary.Status = "Shortfall"
+	case summary.SafeToSpend < 0:
+		summary.Status = "Tight"
+	default:
+		summary.Status = "On track"
+	}
+	return summary, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // // TODO: Consider an UpsertBudgetAllocation if needed due to UNIQUE constraint.
 
 // ClearAllData deletes all data from all tables (for development/reset purposes).
@@ -838,6 +1207,8 @@ func ClearAllData() error {
 	// Delete in order to respect foreign key constraints
 	tables := []string{
 		"budget_allocations",
+		"bills",
+		"cash_flow_settings",
 		"transactions",
 		"budget_periods",
 		"categories",

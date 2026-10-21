@@ -23,13 +23,27 @@ export const GetAccounts = call('GetAccounts');
 export const GetTransactions = call('GetTransactions');
 export const GetCategories = call('GetCategories');
 export const AddCategory = call('AddCategory');
+export const AddCategoryWithDefault = call('AddCategoryWithDefault');
+export const DeleteCategory = call('DeleteCategory');
+export const UpdateCategoryDefaultAmount = call('UpdateCategoryDefaultAmount');
+export const UpdateCategory = call('UpdateCategory');
 export const AddAccount = call('AddAccount');
 export const DeleteAccount = call('DeleteAccount');
+export const UpdateAccountCashFlowInclusion = call('UpdateAccountCashFlowInclusion');
 export const AddTransaction = call('AddTransaction');
+export const GetBills = call('GetBills');
+export const AddBill = call('AddBill');
+export const UpdateBill = call('UpdateBill');
+export const DeleteBill = call('DeleteBill');
+export const GetCashFlowSettings = call('GetCashFlowSettings');
+export const UpdateCashFlowSettings = call('UpdateCashFlowSettings');
+export const GetCashFlowSummary = call('GetCashFlowSummary');
 
 export const GetBudgetPeriods = call('GetBudgetPeriods');
 export const AddBudgetPeriod = call('AddBudgetPeriod');
 export const UpdateBudgetPeriod = call('UpdateBudgetPeriod');
+export const PopulateBudgetPeriodFromDefaults = call('PopulateBudgetPeriodFromDefaults');
+export const CloseAndCreateBudgetPeriod = call('CloseAndCreateBudgetPeriod');
 
 export const GetBudgetAllocationsByBudgetPeriodID = call('GetBudgetAllocationsByBudgetPeriodID');
 export const AddBudgetAllocation = call('AddBudgetAllocation');
@@ -41,3 +55,11 @@ export const CreateEnvelope = call('CreateEnvelope');
 
 // Data management
 export const ClearAllData = call('ClearAllData');
+
+// Optional bank feeds: all provider calls and credentials stay in Go.
+export const GetBankFeedView = call('GetBankFeedView');
+export const StartBankLink = call('StartBankLink');
+export const FinishBankLink = call('FinishBankLink');
+export const ImportBankFeeds = call('ImportBankFeeds');
+export const DisconnectBankFeed = call('DisconnectBankFeed');
+export const CancelBankLink = call('CancelBankLink');

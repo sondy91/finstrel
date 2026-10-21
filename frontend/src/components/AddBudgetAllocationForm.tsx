@@ -13,6 +13,7 @@ interface AddBudgetAllocationFormProps {
   onAllocationModified: () => void;
   existingAllocations: models.BudgetAllocation[];
   allocationToEdit?: models.BudgetAllocation | null;
+	  onCreateCategory: () => void;
 }
 
 const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
@@ -21,6 +22,7 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
   onAllocationModified,
   existingAllocations,
   allocationToEdit,
+	  onCreateCategory,
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [allocatedAmount, setAllocatedAmount] = useState<string>('');
@@ -108,20 +110,24 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
         <Select
           id="ba-category"
           value={selectedCategoryId}
-          onChange={(e) => setSelectedCategoryId(e.target.value)}
+		  onChange={(e) => {
+			const categoryID = e.target.value;
+			setSelectedCategoryId(categoryID);
+			const category = categories.find(item => item.id === Number(categoryID));
+			setAllocatedAmount(category ? String(category.defaultAmount || 0) : '');
+		  }}
           required
           disabled={isEditMode}
         >
           <option value="" disabled={!isEditMode}>Select a category</option>
           {availableCategories.length === 0 && !isEditMode && <option value="" disabled>All categories allocated</option>}
-          {availableCategories.map((category) => (
-            category.type === 'Expense' && (
-                <option key={category.id} value={category.id.toString()}>
-                {category.name}
-                </option>
-            )
-          ))}
+		  {availableCategories.map((category) => (
+			<option key={category.id} value={category.id.toString()}>
+			  {category.name} ({category.type})
+			</option>
+		  ))}
         </Select>
+			{!isEditMode && <div className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm"><span className="text-muted-foreground">Don’t see the category you need?</span><Button type="button" variant="link" className="h-auto p-0" onClick={onCreateCategory}>Create a category</Button></div>}
       </div>
 
       <div className="space-y-2">
@@ -150,4 +156,4 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
   );
 };
 
-export default AddBudgetAllocationForm; 
+export default AddBudgetAllocationForm;

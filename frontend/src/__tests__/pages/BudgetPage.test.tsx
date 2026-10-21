@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import BudgetPage from '../../pages/BudgetPage';
@@ -40,7 +40,7 @@ describe('BudgetPage', () => {
 
   beforeEach(() => {
     // Reset all mocks before each test
-    vi.clearAllMocks();
+    vi.resetAllMocks();
 
     // Set up default mock implementations on mocked adapter API
     (Adapter.GetBudgetPeriods as unknown as Mock).mockResolvedValue(mockBudgetPeriods as any);
@@ -80,7 +80,8 @@ describe('BudgetPage', () => {
     // Check if allocations are displayed
     await waitFor(() => {
       expect(screen.getByText('Groceries')).toBeInTheDocument();
-      expect(screen.getByText('500.00')).toBeInTheDocument();
+      expect(screen.getByText('$500.00')).toBeInTheDocument();
+      expect(Adapter.GetBudgetAllocationsByBudgetPeriodID).toHaveBeenCalledWith(1);
     });
   });
 
@@ -102,28 +103,39 @@ describe('BudgetPage', () => {
     await screen.findByText(/No envelopes found for this period\./i);
 
     // The prompt with link button to add one
-    const addOneLink = await screen.findByRole('button', { name: /Add one\?/i });
+    const addOneLink = await screen.findByRole('button', { name: /Create your first envelope/i });
     await userEvent.click(addOneLink);
 
     // AddBudgetAllocationForm rendered (category label present)
-    await screen.findByLabelText(/Category:/i);
+    await screen.findByLabelText(/^Category$/i);
+    expect(screen.getByRole('button', { name: /^Add Allocation$/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    expect(screen.queryByLabelText(/^Category$/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Create your first envelope/i })).toBeInTheDocument();
   });
 
-  it('handles delete flow via ConfirmModal', async () => {
+  it('deletes an envelope only after confirmation and refreshes allocations', async () => {
     render(<BudgetPage />);
 
     const periodButton = await screen.findByText('August 2025');
     await userEvent.click(periodButton);
 
-    // Click delete on the first row
-    const delBtn = await screen.findByRole('button', { name: /Delete/i });
+    await screen.findByText('Groceries');
+    (Adapter.DeleteBudgetAllocation as unknown as Mock).mockResolvedValueOnce(undefined);
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValueOnce([]);
+
+    const delBtn = screen.getByRole('button', { name: /^Delete Groceries envelope$/i });
     await userEvent.click(delBtn);
 
-    // Confirm modal appears with Delete button text
-    const confirmBtn = await screen.findByRole('button', { name: /^Delete$/i });
+    const dialog = await screen.findByRole('alertdialog', { name: /Are you sure/i });
+    expect(Adapter.DeleteBudgetAllocation).not.toHaveBeenCalled();
+    const confirmBtn = within(dialog).getByRole('button', { name: /^Delete$/i });
     await userEvent.click(confirmBtn);
 
-    expect(Adapter.DeleteBudgetAllocation).toHaveBeenCalledWith(1);
+    await waitFor(() => expect(Adapter.DeleteBudgetAllocation).toHaveBeenCalledWith(1));
+    await screen.findByText(/No envelopes found for this period/i);
+    expect(Adapter.GetBudgetAllocationsByBudgetPeriodID).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Groceries')).not.toBeInTheDocument();
   });
 
   it('shows error when allocations fetch fails', async () => {
@@ -133,7 +145,8 @@ describe('BudgetPage', () => {
     const periodButton = await screen.findByText('August 2025');
     await userEvent.click(periodButton);
 
-    await screen.findByText(/Failed to fetch allocations/i);
+    await screen.findByText('Error: boom');
+    expect(screen.queryByText(/No envelopes found for this period/i)).not.toBeInTheDocument();
   });
 
   it('shows categories error inside Add form when categories fetch fails', async () => {
@@ -145,9 +158,10 @@ describe('BudgetPage', () => {
     await userEvent.click(periodButton);
 
     // Show add form
-    const addOneLink = await screen.findByRole('button', { name: /Add one\?/i });
+    const addOneLink = await screen.findByRole('button', { name: /Create your first envelope/i });
     await userEvent.click(addOneLink);
 
-    await screen.findByText(/Failed to fetch categories/i);
+    await screen.findByText('no cats');
+    expect(screen.queryByLabelText(/^Category$/i)).not.toBeInTheDocument();
   });
 });

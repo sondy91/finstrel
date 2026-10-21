@@ -15,7 +15,8 @@ import { Banknote, Building, CreditCard, Plus, Trash2, Wallet } from 'lucide-rea
 import React, { useCallback, useEffect, useState } from 'react';
 import { models } from '../../wailsjs/go/models';
 import AddAccountForm from '../components/AddAccountForm';
-import { DeleteAccount, GetAccounts } from '../wailsAdapter';
+import BankConnectionsPanel from '../components/BankConnectionsPanel';
+import { DeleteAccount, GetAccounts, UpdateAccountCashFlowInclusion } from '../wailsAdapter';
 
 type Account = models.Account;
 
@@ -62,6 +63,13 @@ const AccountsPage: React.FC = () => {
         }
     };
 
+    const toggleCashFlow = async (account: Account) => {
+        try {
+            await UpdateAccountCashFlowInclusion(account.id, !account.includeInCashFlow);
+            setAccounts(current => current.map(a => a.id === account.id ? { ...a, includeInCashFlow: !a.includeInCashFlow } : a));
+        } catch (err: any) { setError(err.message || 'Failed to update cash-flow inclusion'); }
+    };
+
     const getAccountIcon = (type: string) => {
         switch (type.toLowerCase()) {
             case 'checking':
@@ -89,6 +97,8 @@ const AccountsPage: React.FC = () => {
                     {showAddForm ? 'Cancel' : <><Plus className="mr-2 h-4 w-4" /> Add Account</>}
                 </Button>
             </div>
+
+            <BankConnectionsPanel />
 
             {showAddForm && (
                 <Card className="mb-8 border-primary/20 bg-primary/5">
@@ -158,6 +168,10 @@ const AccountsPage: React.FC = () => {
                                 <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
                                     <span>Initial: ${formatMoney(account.initialBalance)}</span>
                                 </div>
+                                <label className="mt-4 flex cursor-pointer items-center justify-between border-t pt-3 text-sm">
+                                    <span>Include in cash available</span>
+                                    <input type="checkbox" checked={account.includeInCashFlow !== false} onChange={() => toggleCashFlow(account)} />
+                                </label>
                             </CardContent>
                         </Card>
                     ))}

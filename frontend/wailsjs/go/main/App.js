@@ -6,6 +6,10 @@ export function AddAccount(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddAccount'](arg1, arg2, arg3);
 }
 
+export function AddBill(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['AddBill'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function AddBudgetAllocation(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddBudgetAllocation'](arg1, arg2, arg3);
 }
@@ -18,24 +22,60 @@ export function AddCategory(arg1, arg2, arg3) {
   return window['go']['main']['App']['AddCategory'](arg1, arg2, arg3);
 }
 
+export function AddCategoryWithDefault(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['AddCategoryWithDefault'](arg1, arg2, arg3, arg4);
+}
+
 export function AddTransaction(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
   return window['go']['main']['App']['AddTransaction'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function CancelBankLink(arg1) {
+  return window['go']['main']['App']['CancelBankLink'](arg1);
 }
 
 export function ClearAllData() {
   return window['go']['main']['App']['ClearAllData']();
 }
 
+export function CloseAndCreateBudgetPeriod(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CloseAndCreateBudgetPeriod'](arg1, arg2, arg3, arg4);
+}
+
 export function DeleteAccount(arg1) {
   return window['go']['main']['App']['DeleteAccount'](arg1);
+}
+
+export function DeleteBill(arg1) {
+  return window['go']['main']['App']['DeleteBill'](arg1);
 }
 
 export function DeleteBudgetAllocation(arg1) {
   return window['go']['main']['App']['DeleteBudgetAllocation'](arg1);
 }
 
+export function DeleteCategory(arg1) {
+  return window['go']['main']['App']['DeleteCategory'](arg1);
+}
+
+export function DisconnectBankFeed(arg1) {
+  return window['go']['main']['App']['DisconnectBankFeed'](arg1);
+}
+
+export function FinishBankLink(arg1) {
+  return window['go']['main']['App']['FinishBankLink'](arg1);
+}
+
 export function GetAccounts() {
   return window['go']['main']['App']['GetAccounts']();
+}
+
+export function GetBankFeedView() {
+  return window['go']['main']['App']['GetBankFeedView']();
+}
+
+export function GetBills() {
+  return window['go']['main']['App']['GetBills']();
 }
 
 export function GetBudgetAllocation(arg1, arg2) {
@@ -50,6 +90,14 @@ export function GetBudgetPeriods() {
   return window['go']['main']['App']['GetBudgetPeriods']();
 }
 
+export function GetCashFlowSettings() {
+  return window['go']['main']['App']['GetCashFlowSettings']();
+}
+
+export function GetCashFlowSummary() {
+  return window['go']['main']['App']['GetCashFlowSummary']();
+}
+
 export function GetCategories() {
   return window['go']['main']['App']['GetCategories']();
 }
@@ -62,6 +110,26 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function ImportBankFeeds() {
+  return window['go']['main']['App']['ImportBankFeeds']();
+}
+
+export function PopulateBudgetPeriodFromDefaults(arg1) {
+  return window['go']['main']['App']['PopulateBudgetPeriodFromDefaults'](arg1);
+}
+
+export function StartBankLink(arg1) {
+  return window['go']['main']['App']['StartBankLink'](arg1);
+}
+
+export function UpdateAccountCashFlowInclusion(arg1, arg2) {
+  return window['go']['main']['App']['UpdateAccountCashFlowInclusion'](arg1, arg2);
+}
+
+export function UpdateBill(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['UpdateBill'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function UpdateBudgetAllocation(arg1, arg2) {
   return window['go']['main']['App']['UpdateBudgetAllocation'](arg1, arg2);
 }
@@ -72,4 +140,16 @@ export function UpdateBudgetPeriod(arg1, arg2, arg3, arg4) {
 
 export function UpdateBudgetPeriodStatus(arg1, arg2) {
   return window['go']['main']['App']['UpdateBudgetPeriodStatus'](arg1, arg2);
+}
+
+export function UpdateCashFlowSettings(arg1, arg2) {
+  return window['go']['main']['App']['UpdateCashFlowSettings'](arg1, arg2);
+}
+
+export function UpdateCategory(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateCategory'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function UpdateCategoryDefaultAmount(arg1, arg2) {
+  return window['go']['main']['App']['UpdateCategoryDefaultAmount'](arg1, arg2);
 }

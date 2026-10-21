@@ -1,370 +1,47 @@
-import { ArrowRight, Check, DollarSign, Loader2, TrendingDown, TrendingUp, Wallet, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, CheckCircle2, CircleDollarSign, Landmark, Receipt, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { getOnboardingData } from '@/lib/onboarding';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatMoney } from '@/lib/utils';
-import { GetBudgetAllocationsByBudgetPeriodID, GetBudgetPeriods, GetCategories, GetTransactions, UpdateBudgetAllocation } from '@/wailsAdapter';
+import { GetBudgetAllocationsByBudgetPeriodID, GetBudgetPeriods, GetCashFlowSummary, GetCategories, GetTransactions } from '@/wailsAdapter';
 import { models } from '../../wailsjs/go/models';
 
-interface DashboardPageProps {
-  onNavigate?: (view: 'Budgets') => void;
-}
+function money(value: number) { return `$${formatMoney(Math.abs(value))}`; }
 
-function AllocationInput({ allocation, onUpdate }: { allocation: models.BudgetAllocation, onUpdate: (amount: number) => Promise<void> }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async () => {
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 0) return;
-
-    setIsSaving(true);
-    try {
-      await onUpdate(numAmount);
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      setIsEditing(false);
-      setAmount('');
-    }
-  };
-
-  if (!isEditing) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 text-xs"
-        onClick={() => setIsEditing(true)}
-      >
-        Allocate <ArrowRight className="ml-1 h-3 w-3" />
-      </Button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        type="number"
-        placeholder="0.00"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        onKeyDown={handleKeyDown}
-        className="h-8 w-24 text-right"
-        autoFocus
-      />
-      <Button
-        size="sm"
-        className="h-8 w-8 p-0"
-        onClick={handleSave}
-        disabled={isSaving || !amount}
-      >
-        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0"
-        onClick={() => setIsEditing(false)}
-        disabled={isSaving}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-export default function DashboardPage({ onNavigate }: DashboardPageProps) {
-  const [budgetPeriods, setBudgetPeriods] = useState<models.BudgetPeriod[]>([]);
-  const [currentPeriod, setCurrentPeriod] = useState<models.BudgetPeriod | null>(null);
+export default function DashboardPage(_props: { onNavigate?: (view: 'Budgets') => void }) {
+  const [summary, setSummary] = useState<models.CashFlowSummary | null>(null);
+  const [period, setPeriod] = useState<models.BudgetPeriod | null>(null);
   const [allocations, setAllocations] = useState<models.BudgetAllocation[]>([]);
   const [categories, setCategories] = useState<models.Category[]>([]);
   const [transactions, setTransactions] = useState<models.Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const onboardingData = getOnboardingData();
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { async function load() { try {
+    const [cashFlow, periods, cats, txs] = await Promise.all([GetCashFlowSummary(), GetBudgetPeriods(), GetCategories(), GetTransactions()]);
+    setSummary(cashFlow); setCategories(cats || []); setTransactions(txs || []);
+    const active = (periods || []).filter((p: models.BudgetPeriod) => p.status === 'Open').sort((a: models.BudgetPeriod, b: models.BudgetPeriod) => String(b.startDate).localeCompare(String(a.startDate)))[0];
+    setPeriod(active || null); if (active) setAllocations((await GetBudgetAllocationsByBudgetPeriodID(active.id)) || []);
+  } catch (error) { console.error('Failed to load cash-flow dashboard:', error); } finally { setLoading(false); } } load(); }, []);
 
-  const loadDashboardData = async () => {
-    try {
-      const [periods, cats, txs] = await Promise.all([
-        GetBudgetPeriods(),
-        GetCategories(),
-        GetTransactions()
-      ]);
+  // Budget details must never pull expenses from outside this selected period.
+  const periodTransactions = period ? transactions.filter(t => { const d = new Date(t.date).getTime(); return d >= new Date(period.startDate).getTime() && d <= new Date(period.endDate).getTime(); }) : [];
+  const spentByCategory = periodTransactions.filter(t => t.type === 'Expense').reduce((result, tx) => { result[tx.categoryId] = (result[tx.categoryId] || 0) + Math.abs(tx.amount); return result; }, {} as Record<number, number>);
+	const expenseAllocations = allocations.filter(allocation => categories.find(category => category.id === allocation.categoryId)?.type === 'Expense');
+  if (loading) return <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">Loading cash-flow forecast…</div>;
+  if (!summary) return <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">Unable to load your forecast.</div>;
+  const payday = summary.nextPaycheckDate ? new Date(summary.nextPaycheckDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
+  const shortfall = summary.status === 'Shortfall'; const tight = summary.status === 'Tight';
 
-      setBudgetPeriods(periods || []);
-      setCategories(cats || []);
-      setTransactions(txs || []);
-
-      // Get the most recent open period
-      const openPeriods = (periods || []).filter((p: models.BudgetPeriod) => p.status === 'Open');
-      if (openPeriods.length > 0) {
-        const latest = openPeriods[0];
-        setCurrentPeriod(latest);
-
-        const allocs = await GetBudgetAllocationsByBudgetPeriodID(latest.id);
-        setAllocations(allocs || []);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const handleUpdateAllocation = async (allocation: models.BudgetAllocation, newAmount: number) => {
-    // Optimistic update
-    const updatedAllocation = new models.BudgetAllocation({
-      ...allocation,
-      allocatedAmount: newAmount
-    });
-
-    setAllocations(prev => prev.map(a =>
-      a.id === allocation.id ? updatedAllocation : a
-    ));
-
-    try {
-      await UpdateBudgetAllocation(allocation.id, newAmount);
-      // We can optionally re-fetch here to ensure sync, but the optimistic update 
-      // handles the immediate UI feedback.
-      // const allocs = await GetBudgetAllocationsByBudgetPeriodID(currentPeriod!.id);
-      // setAllocations(allocs || []);
-    } catch (error) {
-      console.error('Failed to update allocation:', error);
-      // Revert on error
-      setAllocations(prev => prev.map(a =>
-        a.id === allocation.id ? allocation : a
-      ));
-    }
-  };
-
-  // Calculate totals
-  const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
-  const envelopeCount = allocations.length;
-
-  const totalIncome = transactions
-    .filter(t => t.type === 'Income')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-  const totalExpenses = transactions
-    .filter(t => t.type === 'Expense')
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-
-  // Calculate spent per category for the current period
-  const categorySpent = transactions
-    .filter(t => t.type === 'Expense')
-    .reduce((acc, t) => {
-      acc[t.categoryId] = (acc[t.categoryId] || 0) + Math.abs(t.amount);
-      return acc;
-    }, {} as Record<number, number>);
-
-  const getCategoryName = (categoryId: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category ? category.name : `Category ID: ${categoryId}`;
-  };
-
-  const getProgressColor = (percentage: number) => {
-    if (percentage >= 100) return 'bg-destructive';
-    if (percentage >= 80) return 'bg-yellow-500';
-    return 'bg-primary';
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">Loading dashboard...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="page-container max-w-7xl mx-auto py-8 px-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome back! Here's an overview of your finances.
-        </p>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Allocated</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${formatMoney(totalAllocated)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Across {envelopeCount} envelope{envelopeCount !== 1 ? 's' : ''}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget Periods</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{budgetPeriods.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {currentPeriod ? currentPeriod.name : 'No active period'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Income</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${formatMoney(totalIncome)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total income recorded
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${formatMoney(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">
-              Total expenses recorded
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Current Budget Period */}
-      {currentPeriod && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Current Budget: {currentPeriod.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {allocations.length > 0 ? (
-              <div className="space-y-6">
-                {allocations.map((allocation) => {
-                  const spent = categorySpent[allocation.categoryId] || 0;
-                  const isZeroAllocation = allocation.allocatedAmount === 0;
-
-                  let percentage = 0;
-                  if (!isZeroAllocation) {
-                    percentage = Math.min((spent / allocation.allocatedAmount) * 100, 100);
-                  }
-
-                  const remaining = allocation.allocatedAmount - spent;
-
-                  return (
-                    <div key={allocation.id} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{getCategoryName(allocation.categoryId)}</p>
-                        <div className="text-right">
-                          {isZeroAllocation ? (
-                            <span className="text-sm text-muted-foreground">Not Allocated</span>
-                          ) : (
-                            <>
-                              <span className="text-sm font-medium">${formatMoney(spent)}</span>
-                              <span className="text-sm text-muted-foreground"> / ${formatMoney(allocation.allocatedAmount)}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {isZeroAllocation ? (
-                        <div className="flex items-center justify-between bg-muted/30 p-2 rounded-md">
-                          <span className="text-xs text-muted-foreground">No funds allocated to this category yet.</span>
-                          <AllocationInput
-                            allocation={allocation}
-                            onUpdate={(amount) => handleUpdateAllocation(allocation, amount)}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 ${getProgressColor(percentage)}`}
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>{percentage.toFixed(0)}% Used</span>
-                            <span>${formatMoney(remaining)} Remaining</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">
-                No envelopes created yet. Visit the Budgets page to set up your allocations.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Your Goals */}
-      {onboardingData && onboardingData.goals.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Financial Goals</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {onboardingData.goals.map((goal) => (
-                <div
-                  key={goal}
-                  className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
-                >
-                  {goal === 'debt' && 'Pay off debt'}
-                  {goal === 'emergency' && 'Build emergency fund'}
-                  {goal === 'savings' && 'Save for a goal'}
-                  {goal === 'budget' && 'Create a budget'}
-                  {goal === 'other' && 'Something else'}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Empty State */}
-      {!currentPeriod && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Budget Period Found</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-4">
-              It looks like you haven't created a budget period yet. Get started by visiting the Budgets page.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+  return <div className="page-container mx-auto max-w-7xl px-6 py-8">
+    <div className="mb-8"><h1 className="text-3xl font-bold tracking-tight">Are we okay until payday?</h1><p className="mt-2 text-muted-foreground">Spendable cash, scheduled bills, and remaining envelopes—kept separate from your budget plan.</p></div>
+    {!payday && <Card className="mb-6 border-yellow-500/50"><CardContent className="flex gap-3 pt-6"><CalendarDays className="h-5 w-5 text-yellow-600" /><div><p className="font-medium">Add your next payday to start a complete forecast.</p><p className="text-sm text-muted-foreground">Set it in Settings; budget periods and pay periods stay separate.</p></div></CardContent></Card>}
+    <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Stat title="Cash Available" value={money(summary.cashAvailable)} detail="Included accounts only" icon={<Wallet className="h-4 w-4" />} />
+      <Stat title="Upcoming Bills" value={`-${money(summary.upcomingBills)}`} detail={payday ? `Due by ${payday}` : 'Set a payday to calculate'} icon={<Receipt className="h-4 w-4" />} />
+      <Stat title="Flexible Spending Remaining" value={`-${money(summary.flexibleSpendingRemaining)}`} detail={period ? period.name : 'No open budget'} icon={<CircleDollarSign className="h-4 w-4" />} />
+      <Stat title="Projected Balance" value={`${shortfall ? '-' : ''}${money(summary.projectedBalance)}`} detail="At next paycheck" icon={<Landmark className="h-4 w-4" />} emphasis={shortfall} />
     </div>
-  );
+    <Card className="mb-8"><CardHeader><CardTitle className="flex items-center gap-2">{shortfall || tight ? <AlertTriangle className="h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />} {summary.status}</CardTitle><CardDescription>{payday ? `Next payday: ${payday}` : 'Forecasting begins once a payday is configured.'}</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex justify-between"><span>Projected balance</span><strong>{summary.projectedBalance < 0 ? '-' : ''}{money(summary.projectedBalance)}</strong></div><div className="flex justify-between text-muted-foreground"><span>Desired cash buffer</span><span>-{money(summary.desiredCashBuffer)}</span></div><div className="flex justify-between border-t pt-3 text-lg"><span>Safe to spend</span><strong className={summary.safeToSpend < 0 ? 'text-destructive' : 'text-primary'}>{summary.safeToSpend < 0 ? '-' : ''}{money(summary.safeToSpend)}</strong></div></CardContent></Card>
+	{period && <Card><CardHeader><CardTitle>Current envelope progress: {period.name}</CardTitle><CardDescription>Only expenses dated within this budget period are included.</CardDescription></CardHeader><CardContent className="space-y-4">{expenseAllocations.length ? expenseAllocations.map(a => { const spent = spentByCategory[a.categoryId] || 0; const remaining = a.allocatedAmount - spent; const category = categories.find(c => c.id === a.categoryId)?.name || 'Uncategorized'; return <div key={a.id}><div className="mb-1 flex justify-between text-sm"><span className="font-medium">{category}</span><span>{money(spent)} / {money(a.allocatedAmount)}</span></div><div className="h-2 overflow-hidden rounded bg-muted"><div className={remaining < 0 ? 'h-full bg-destructive' : 'h-full bg-primary'} style={{ width: `${Math.min(100, a.allocatedAmount ? spent / a.allocatedAmount * 100 : 0)}%` }} /></div><div className="mt-1 text-right text-xs text-muted-foreground">{remaining < 0 ? `${money(-remaining)} over` : `${money(remaining)} remaining`}</div></div> }) : <p className="text-muted-foreground">No expense envelopes in this budget period.</p>}</CardContent></Card>}
+  </div>;
 }
+
+function Stat({ title, value, detail, icon, emphasis }: { title: string; value: string; detail: string; icon: React.ReactNode; emphasis?: boolean }) { return <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{title}</CardTitle><span className="text-muted-foreground">{icon}</span></CardHeader><CardContent><div className={`text-2xl font-bold ${emphasis ? 'text-destructive' : ''}`}>{value}</div><p className="text-xs text-muted-foreground">{detail}</p></CardContent></Card>; }

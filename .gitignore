@@ -5,3 +5,9 @@ frontend/dist
 frontend/package-lock.json
 frontend/package.json.md5
 frontend/src/wailsjs/
+
+# Bank-feed credentials and encrypted local snapshots
+.env*
+!.env.example
+*.enc
+*.enc.bak

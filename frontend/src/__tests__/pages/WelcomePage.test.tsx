@@ -43,14 +43,14 @@ describe('WelcomePage', () => {
       screen.getByRole('heading', { name: /welcome to vestramaximus/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/streamline your budgets, track envelopes/i)
+      screen.getByText(/plan budgets and track envelopes/i)
     ).toBeInTheDocument();
 
     const cta = screen.getByRole('button', { name: /get started/i });
     expect(cta).toBeInTheDocument();
 
     const stepIndicators = screen.getAllByLabelText(/wizard step/i);
-    expect(stepIndicators).toHaveLength(4);
+    expect(stepIndicators).toHaveLength(5);
     expect(stepIndicators[0]).toHaveAttribute('data-active', 'true');
 
     await user.click(cta);
@@ -68,6 +68,7 @@ describe('WelcomePage', () => {
     await user.click(lightModeBtn);
 
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(window.localStorage.getItem('vestra-theme')).toBe('light');
   });
 
   it('navigates to step 2 and allows accent color and theme selection', async () => {
@@ -81,6 +82,7 @@ describe('WelcomePage', () => {
     const blueAccent = screen.getByLabelText(/select blue accent/i);
     await user.click(blueAccent);
     expect(blueAccent).toHaveClass('scale-110');
+    expect(window.localStorage.getItem('vestra-accent')).toBe('blue');
 
     const lightModeBtn = screen.getByRole('button', { name: /light/i });
     await user.click(lightModeBtn);
@@ -120,4 +122,22 @@ describe('WelcomePage', () => {
     await user.click(debtGoal);
     expect(debtGoal).not.toHaveClass('border-primary');
   });
+  it('completes all five steps and saves the chosen category amounts', async () => {
+    const {user,onGetStarted}=renderWelcome();
+    await user.click(screen.getByRole('button',{name:/get started/i}));
+    await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.click(screen.getByLabelText(/select goal: pay off debt/i));
+    await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.click(screen.getByLabelText(/select category: groceries/i));
+    await user.click(screen.getByLabelText(/select category: utilities/i));
+    await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.type(screen.getByRole('spinbutton',{name:/groceries/i}),'275.50');
+    await user.click(screen.getByRole('button',{name:/complete/i}));
+    expect(onGetStarted).toHaveBeenCalledOnce();
+    expect(window.localStorage.getItem('vestra-onboarding-complete')).toBe('true');
+    expect(JSON.parse(window.localStorage.getItem('vestra-onboarding-data')!)).toMatchObject({
+      goals:['debt'],categories:['groceries','utilities'],defaultAmounts:{groceries:275.5,utilities:0},
+    });
+  });
+
 });
