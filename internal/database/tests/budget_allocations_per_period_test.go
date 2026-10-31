@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"vestramaximus/internal/database"
-	"vestramaximus/internal/models"
+	"finstrel/internal/database"
+	"finstrel/internal/models"
 )
 
 func setupTempDB(t *testing.T) func() {

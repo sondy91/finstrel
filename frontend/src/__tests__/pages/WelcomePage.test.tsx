@@ -40,7 +40,7 @@ describe('WelcomePage', () => {
     const { user } = renderWelcome();
 
     expect(
-      screen.getByRole('heading', { name: /welcome to vestramaximus/i })
+      screen.getByRole('heading', { name: /welcome to finstrel/i })
     ).toBeInTheDocument();
     expect(
       screen.getByText(/plan budgets and track envelopes/i)
@@ -100,7 +100,7 @@ describe('WelcomePage', () => {
     const backBtn = screen.getByRole('button', { name: /back/i });
     await user.click(backBtn);
 
-    expect(screen.getByText(/welcome to vestramaximus/i)).toBeInTheDocument();
+    expect(screen.getByText(/welcome to finstrel/i)).toBeInTheDocument();
   });
 
   it('navigates to step 3 and allows goal selection', async () => {

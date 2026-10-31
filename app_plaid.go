@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"time"
-	"vestramaximus/internal/bankfeed"
+	"finstrel/internal/bankfeed"
 
 	"github.com/pkg/browser"
 )

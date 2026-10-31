@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"vestramaximus/internal/models"
+	"finstrel/internal/models"
 )
 
 // EnvelopeRepository defines the interface for envelope data operations

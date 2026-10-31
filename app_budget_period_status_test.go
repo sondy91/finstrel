@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"vestramaximus/internal/database"
-	"vestramaximus/internal/models"
+	"finstrel/internal/database"
+	"finstrel/internal/models"
 )
 
 func TestApp_UpdateBudgetPeriodStatus_Table(t *testing.T) {

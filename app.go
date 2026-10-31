@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"vestramaximus/internal/bankfeed"
-	"vestramaximus/internal/database"
-	"vestramaximus/internal/models"
+	"finstrel/internal/bankfeed"
+	"finstrel/internal/database"
+	"finstrel/internal/models"
 )
 
 // App struct

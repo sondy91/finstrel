@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"vestramaximus/internal/handlers"
-	"vestramaximus/internal/models"
+	"finstrel/internal/handlers"
+	"finstrel/internal/models"
 )
 
 // MockEnvelopeRepository is a mock implementation of the EnvelopeRepository interface

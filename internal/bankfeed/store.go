@@ -40,7 +40,8 @@ type vault struct {
 func newVault(dir, environment string, secrets credentials) *vault {
 	abs, _ := filepath.Abs(dir)
 	scope := sha256.Sum256([]byte(abs + ":" + environment))
-	return &vault{path: filepath.Join(dir, "feed.enc"), namespace: "vestramaximus.plaid." + hex.EncodeToString(scope[:12]), credentials: secrets}
+	namespace := "finstrel.plaid."
+	return &vault{path: filepath.Join(dir, "feed.enc"), namespace: namespace + hex.EncodeToString(scope[:12]), credentials: secrets}
 }
 
 func (v *vault) cipher(create bool) (cipher.AEAD, error) {

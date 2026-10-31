@@ -1,4 +1,4 @@
-# VestraMaximus Data Structure Map
+# Finstrel Data Structure Map
 
 ## Overview
 

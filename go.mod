@@ -1,4 +1,4 @@
-module vestramaximus
+module finstrel
 
 go 1.23
 

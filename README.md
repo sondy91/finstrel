@@ -1,8 +1,8 @@
-# VestraMaximus
+# Finstrel
 
 > **A privacy-focused, local-first personal finance application.**
 
-VestraMaximus is designed to replace spreadsheet-based budgeting with a streamlined, secure desktop application. Budgeting works locally without a bank connection. Optional Plaid imports retrieve bank data through Plaid and store the imported records encrypted on your device.
+Finstrel is designed to replace spreadsheet-based budgeting with a streamlined, secure desktop application. Budgeting works locally without a bank connection. Optional Plaid imports retrieve bank data through Plaid and store the imported records encrypted on your device.
 
 ## 🚀 Key Features
 
@@ -32,8 +32,8 @@ VestraMaximus is designed to replace spreadsheet-based budgeting with a streamli
 
 1.  Clone the repository:
     ```bash
-    git clone https://gitlab.com/asonderman/vestramaximus.git
-    cd vestramaximus
+    git clone https://github.com/sondy91/finstrel.git
+    cd finstrel
     ```
 
 2.  Install frontend dependencies:
@@ -127,6 +127,6 @@ AuditLog(id PK, timestamp, action, entity, entity_id, summary)
 
 The Accounts page can connect US Sandbox accounts, import available bank/card transactions and balances, show supported debt terms and investments, reconnect, and revoke a connection. These imported feeds remain separate from the manual ledger and forecasts. Use **Disconnect** to revoke a bank connection and remove its local feed. Settings’ manual-budget reset does not remove bank feeds.
 
-API calls and credentials stay in Go. The backend reads `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` from process settings or the private `vestramaximus/plaid/.env` inside the operating system’s application settings directory; the project `.env` is a development fallback. Use Plaid’s official CLI, `plaid keys write --env sandbox --gitignore`, in the selected settings directory to provision keys without displaying them. Never put credentials in frontend variables or source files. On macOS, the private settings directory is `~/Library/Application Support/vestramaximus/plaid`.
+API calls and credentials stay in Go. The backend reads `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV` from process settings or the private `finstrel/plaid/.env` inside the operating system’s application settings directory; the project `.env` is a development fallback. Use Plaid’s official CLI, `plaid keys write --env sandbox --gitignore`, in the selected settings directory to provision keys without displaying them. Never put credentials in frontend variables or source files. On macOS, the private settings directory is `~/Library/Application Support/finstrel/plaid`. Existing data under the former name is not loaded; connect Plaid again to start fresh.
 
 The current version uses explicit manual imports. Real-bank/Production use, OAuth-institution setup, scheduled imports, posting imported activity into envelopes, and forecasting from bank feeds remain separate follow-up work. See [PLAID_PLAN.md](PLAID_PLAN.md) for the checked scope, test evidence, and pending browser verification.

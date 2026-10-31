@@ -1,6 +1,6 @@
-# VestraMaximus Functional Specification
+# Finstrel Functional Specification
 
-> Implementation-agnostic specification capturing all functionality of the VestraMaximus personal finance application as built. This document describes WHAT the app does, not how it's implemented, enabling identical behavior on any technology stack.
+> Implementation-agnostic specification capturing all functionality of the Finstrel personal finance application as built. This document describes WHAT the app does, not how it's implemented, enabling identical behavior on any technology stack.
 
 **Version:** 1.0  
 **Date:** 2026-04-26  
@@ -37,7 +37,7 @@
 
 ### Product Summary
 
-VestraMaximus is a **local-first, privacy-focused personal finance desktop application** implementing envelope-style budgeting. All financial data remains exclusively on the user's device with no network connectivity, cloud sync, or external API integrations. Users manually enter income and expense transactions, create budget periods with allocated envelopes, and track spending against those allocations with visual progress indicators.
+Finstrel is a **local-first, privacy-focused personal finance desktop application** implementing envelope-style budgeting. All financial data remains exclusively on the user's device with no network connectivity, cloud sync, or external API integrations. Users manually enter income and expense transactions, create budget periods with allocated envelopes, and track spending against those allocations with visual progress indicators.
 
 ### Target User
 
@@ -431,7 +431,7 @@ If onboarding goals exist, display them as chips with human-readable labels.
 ### About Panel
 
 Displays:
-- Product name: "VestraMaximus"
+- Product name: "Finstrel"
 - Tagline: "Local-first envelope budgeting"
 - Privacy note: "All data stored locally on your device"
 

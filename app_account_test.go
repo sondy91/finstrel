@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"vestramaximus/internal/database"
+	"finstrel/internal/database"
 
 	"github.com/stretchr/testify/require"
 )

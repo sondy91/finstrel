@@ -132,7 +132,7 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.25),_transparent_60%)]" />
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-10">
         {/* <header className="flex items-center justify-between">
-          <span className="text-lg font-semibold tracking-wide text-muted-foreground">VestraMaximus</span>
+          <span className="text-lg font-semibold tracking-wide text-muted-foreground">Finstrel</span>
         </header> */}
         <main className="flex flex-1 items-center justify-center">
           <Card className="w-full max-w-2xl border-border/70 bg-card/80 backdrop-blur">
@@ -141,7 +141,7 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
               {currentStep === 1 && (
                 <div className="space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
-                    Welcome to VestraMaximus
+                    Welcome to Finstrel
                   </h1>
                   <p className="text-base text-muted-foreground">
                     Plan budgets and track envelopes on your device. Optional bank imports use Plaid.

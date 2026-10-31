@@ -35,7 +35,7 @@ func New(openURL func(string) error) (*Service, error) {
 	}
 	// Finder launches have no project working directory. Prefer one private
 	// backend settings file, with the repo .env as a development fallback.
-	for _, file := range []string{filepath.Join(dir, "vestramaximus", "plaid", ".env"), ".env"} {
+	for _, file := range []string{filepath.Join(dir, "finstrel", "plaid", ".env"), ".env"} {
 		if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
 			continue
 		} else if err != nil {
@@ -53,7 +53,7 @@ func New(openURL func(string) error) (*Service, error) {
 	if environment != "sandbox" && environment != "production" {
 		return nil, errors.New("PLAID_ENV must be sandbox or production.")
 	}
-	s := &Service{environment: environment, openURL: openURL, vault: newVault(filepath.Join(dir, "vestramaximus", "plaid", environment), environment, systemCredentials{})}
+	s := &Service{environment: environment, openURL: openURL, vault: newVault(filepath.Join(dir, "finstrel", "plaid", environment), environment, systemCredentials{})}
 	clientID, secret := os.Getenv("PLAID_CLIENT_ID"), os.Getenv("PLAID_SECRET")
 	if clientID != "" && secret != "" {
 		s.provider = newProvider(clientID, secret, environment)

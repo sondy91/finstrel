@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"vestramaximus/internal/models" // Add models import
+	"finstrel/internal/models" // Add models import
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
 var db *sql.DB
 
-const dbFileName = "vestramaximus.db"
+const dbFileName = "finstrel.db"
 
 // InitDB initializes the database connection and creates tables if they don't exist.
 func InitDB() error {

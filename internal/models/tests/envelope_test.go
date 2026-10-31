@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"vestramaximus/internal/models"
+	"finstrel/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 

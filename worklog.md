@@ -1,4 +1,4 @@
-# Vestramaximus Development Worklog
+# Finstrel Development Worklog
 
 ## Phase 0: Setup & Project Initialization (DONE)
 
@@ -6,7 +6,7 @@
 - [x] Install Node.js & pnpm
 - [x] Install Wails CLI
 - [x] Install Platform Dependencies (`wails doctor`)
-- [x] Create Wails Project (`wails init -n vestramaximus -t react-ts`)
+- [x] Create Wails Project (`wails init -n finstrel -t react-ts`)
 - [x] Initial Run (`wails dev` / `wails dev -tags webkit2_41`)
 - [x] Initialize Git Repo & Initial Commit
 

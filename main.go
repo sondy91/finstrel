@@ -18,7 +18,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:            "vestramaximus",
+		Title:            "Finstrel",
 		MinWidth:         1080,
 		MinHeight:        720,
 		WindowStartState: options.Maximised,

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"vestramaximus/internal/models"
+	"finstrel/internal/models"
 )
 
 // EnvelopeRepository implements the handlers.EnvelopeRepository interface

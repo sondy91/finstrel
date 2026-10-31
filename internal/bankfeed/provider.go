@@ -108,7 +108,7 @@ func newProvider(clientID, secret, environment string) *provider {
 }
 
 func (p *provider) createLink(ctx context.Context, userID, token string) (*plaid.LinkTokenCreateResponse, error) {
-	r := &plaid.LinkTokenCreateRequest{ClientName: "Vestramaximus", Language: "en", CountryCodes: []plaid.CountryCode{plaid.CountryCodeUs}, User: &plaid.LinkTokenCreateRequestUser{ClientUserID: userID}, HostedLink: &plaid.LinkTokenCreateHostedLink{}}
+	r := &plaid.LinkTokenCreateRequest{ClientName: "Finstrel", Language: "en", CountryCodes: []plaid.CountryCode{plaid.CountryCodeUs}, User: &plaid.LinkTokenCreateRequestUser{ClientUserID: userID}, HostedLink: &plaid.LinkTokenCreateHostedLink{}}
 	if token != "" {
 		r.AccessToken = &token
 	} else {

@@ -206,7 +206,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <p>
-              <strong className="text-foreground">VestraMaximus</strong> - Local-first envelope budgeting
+              <strong className="text-foreground">Finstrel</strong> - Local-first envelope budgeting
             </p>
             <p>Privacy-focused personal finance management</p>
             <p className="text-xs">Budgets are stored on your device. Optional bank imports retrieve data through Plaid.</p>

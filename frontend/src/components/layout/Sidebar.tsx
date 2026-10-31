@@ -44,7 +44,7 @@ function SidebarContent({ currentView, onNavigate, onItemClick }: SidebarProps &
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
           <Flame className="h-5 w-5" />
         </div>
-        <span className="text-lg font-semibold tracking-tight">VestraMaximus</span>
+        <span className="text-lg font-semibold tracking-tight">Finstrel</span>
       </div>
 
       {/* Navigation */}
@@ -125,7 +125,7 @@ function MobileSidebar({ currentView, onNavigate, isOpen, onClose }: MobileSideb
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
               <Flame className="h-5 w-5" />
             </div>
-            <span className="text-lg font-semibold tracking-tight">VestraMaximus</span>
+            <span className="text-lg font-semibold tracking-tight">Finstrel</span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -180,7 +180,7 @@ function _LegacySidebar({ currentView, onNavigate }: SidebarProps) {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
           <Flame className="h-5 w-5" />
         </div>
-        <span className="text-lg font-semibold tracking-tight">VestraMaximus</span>
+        <span className="text-lg font-semibold tracking-tight">Finstrel</span>
       </div>
 
       {/* Navigation */}
