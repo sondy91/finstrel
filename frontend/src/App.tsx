@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import PracticePage from './pages/PracticePage';
+import { createPracticeSession, setPracticeSession, type PracticeSession } from './lib/practice';
+import { GetBankFeedView } from './wailsAdapter';
+import { type TransactionFilter } from './lib/transactionBrowser';
+import CalendarPage from './pages/CalendarPage';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import AppShell from './components/layout/AppShell';
 import { ThemeProvider } from './components/theme/ThemeProvider';
@@ -15,10 +20,13 @@ import WelcomePage from './pages/WelcomePage';
 import { GetAccounts, GetBudgetPeriods } from './wailsAdapter';
 
 // Define possible views/pages
-type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings';
+type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings' | 'Calendar';
 
-function App() {
+function BudgetApp({onPractice}:{onPractice:()=>void}) {
     const [hasOnboarded, setHasOnboarded] = useState(() => hasCompletedOnboarding());
+    const [transactionFilter,setTransactionFilter]=useState<TransactionFilter|undefined>();
+    const browseTransactions=useCallback((filter:TransactionFilter)=>{setTransactionFilter(filter);setCurrentView('Transactions');},[]);
+    const navigate=useCallback((view:View)=>{if(view==='Transactions')setTransactionFilter(undefined);setCurrentView(view);},[]);
     const [currentView, setCurrentView] = useState<View>('Dashboard');
     const [isSeeding, setIsSeeding] = useState(false);
     const [isCheckingLedger, setIsCheckingLedger] = useState(true);
@@ -77,23 +85,25 @@ function App() {
     const content = useMemo(() => {
         switch (currentView) {
             case 'Dashboard':
-                return <DashboardPage onNavigate={setCurrentView} />;
+                return <DashboardPage onNavigate={navigate} />;
+            case 'Calendar':
+                return <CalendarPage />;
             case 'Accounts':
-                return <AccountsPage />;
+                return <AccountsPage onBrowseTransactions={browseTransactions} />;
             case 'Categories':
                 return <CategoriesPage />;
             case 'Transactions':
-                return <TransactionsPage />;
+                return <TransactionsPage key={JSON.stringify(transactionFilter)||'default'} initialFilter={transactionFilter} />;
             case 'Budgets':
-                return <BudgetPage />;
+                return <BudgetPage onBrowseTransactions={browseTransactions} />;
             case 'Reports':
                 return <ReportsPage />;
             case 'Settings':
-                return <SettingsPage />;
+                return <SettingsPage onCalendar={()=>setCurrentView('Calendar')} onPractice={onPractice} />;
             default:
-                return <DashboardPage onNavigate={setCurrentView} />;
+                return <DashboardPage onNavigate={navigate} />;
         }
-    }, [currentView]);
+    }, [currentView,transactionFilter,browseTransactions,onPractice]);
 
     if (isCheckingLedger || startupError) {
         return (
@@ -117,7 +127,7 @@ function App() {
     if (!hasOnboarded) {
         return (
             <ThemeProvider>
-                <WelcomePage onGetStarted={() => setHasOnboarded(true)} />
+                <WelcomePage onGetStarted={() => setHasOnboarded(true)} onPractice={onPractice} />
             </ThemeProvider>
         );
     }
@@ -137,11 +147,30 @@ function App() {
 
     return (
         <ThemeProvider>
-            <AppShell currentView={currentView} onNavigate={setCurrentView}>
+            <AppShell currentView={currentView} onNavigate={navigate}>
                 {content}
             </AppShell>
         </ThemeProvider>
     );
 }
 
-export default App;
+export default function App() {
+    const [practice, setPractice] = useState<PracticeSession | null>(null);
+    const [practiceRevision, setPracticeRevision] = useState(0);
+    const [openingPractice, setOpeningPractice] = useState(false);
+    const opening = useRef(false);
+    const startPractice = useCallback(async () => {
+        if (opening.current) return;
+        opening.current = true; setOpeningPractice(true);
+        let cached;
+        try { cached = await GetBankFeedView(); } catch { /* Manual practice remains usable. */ }
+        const next = createPracticeSession(cached);
+        setPracticeSession(next); setPractice(next);
+        opening.current = false; setOpeningPractice(false);
+    }, []);
+    if (practice) return <ThemeProvider><PracticePage key={practiceRevision} session={practice} onReset={() => {
+        const reset = practice.reset();
+        setPracticeSession(reset); setPractice(reset); setPracticeRevision(n => n + 1);
+    }} onExit={() => { setPracticeSession(null); setPractice(null); }} /></ThemeProvider>;
+    return <><BudgetApp onPractice={() => void startPractice()} />{openingPractice && <p role="status" className="fixed bottom-4 right-4 rounded border bg-background px-4 py-3 text-sm text-foreground shadow">Opening practice household…</p>}</>;
+}

@@ -1,3 +1,4 @@
+import BudgetDateFields from './BudgetDateFields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,30 +77,7 @@ const AddBudgetPeriodForm: React.FC<AddBudgetPeriodFormProps> = ({ onBudgetPerio
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="bp-start-date">Start Date</Label>
-          <Input
-            id="bp-start-date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            required
-            className="dark:[color-scheme:dark]"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="bp-end-date">End Date</Label>
-          <Input
-            id="bp-end-date"
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            required
-            className="dark:[color-scheme:dark]"
-          />
-        </div>
-      </div>
+      <BudgetDateFields prefix="bp" start={startDate} end={endDate} onStart={setStartDate} onEnd={setEndDate} />
 
       <div className="space-y-2">
         <Label htmlFor="bp-status">Status</Label>

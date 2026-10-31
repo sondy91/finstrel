@@ -6,6 +6,7 @@ import * as Adapter from '../../wailsAdapter';
 // Mock adapter BEFORE importing the component under test
 vi.mock('../../wailsAdapter', () => ({
   GetBudgetPeriods: vi.fn(),
+  GetBudgetReview: vi.fn(),
   GetBudgetAllocationsByBudgetPeriodID: vi.fn(),
   GetCategories: vi.fn(),
   DeleteBudgetAllocation: vi.fn(),
@@ -47,6 +48,7 @@ describe('BudgetPage', () => {
     (Adapter.GetCategories as unknown as Mock).mockResolvedValue(mockCategories as any);
     (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValue(mockAllocations as any);
 
+    (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({manualCount:0,manualPending:0,manualExpenses:0,plannedExpenses:500,importedCount:0,importedPending:0,importedExpensesUSD:0,environment:'sandbox',bankNotice:'History may be incomplete.',imported:[]});
     // No need to stub window.go when mocking the adapter directly
   });
 

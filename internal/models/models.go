@@ -1,6 +1,7 @@
 package models
 
 import "time"
+import "finstrel/internal/schedule"
 
 // Account represents a financial account (e.g., Checking, Savings, Credit Card).
 type Account struct {
@@ -17,13 +18,14 @@ type Account struct {
 // Bill is a recurring expected expense. It is deliberately not a transaction;
 // a real transaction is only created when the expense actually occurs.
 type Bill struct {
-	ID         int64   `json:"id"`
-	Name       string  `json:"name"`
-	Amount     float64 `json:"amount"`
-	CategoryID int64   `json:"categoryId"`
-	DueDay     int     `json:"dueDay"`
-	AccountID  *int64  `json:"accountId"`
-	Active     bool    `json:"active"`
+	Schedule   schedule.Rule `json:"schedule"`
+	ID         int64         `json:"id"`
+	Name       string        `json:"name"`
+	Amount     float64       `json:"amount"`
+	CategoryID int64         `json:"categoryId"`
+	DueDay     int           `json:"dueDay"`
+	AccountID  *int64        `json:"accountId"`
+	Active     bool          `json:"active"`
 }
 
 // CashFlowSettings are intentionally independent of a BudgetPeriod.

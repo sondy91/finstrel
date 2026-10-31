@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 
 import Sidebar from './Sidebar';
 
-type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings';
+type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings' | 'Calendar';
 
 interface AppShellProps {
   currentView: View;

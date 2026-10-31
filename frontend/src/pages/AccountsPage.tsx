@@ -1,3 +1,4 @@
+import { type TransactionFilter } from '@/lib/transactionBrowser';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,7 +21,7 @@ import { DeleteAccount, GetAccounts, UpdateAccountCashFlowInclusion } from '../w
 
 type Account = models.Account;
 
-const AccountsPage: React.FC = () => {
+const AccountsPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>void}> = ({onBrowseTransactions}) => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,9 @@ const AccountsPage: React.FC = () => {
                 </Button>
             </div>
 
-            <BankConnectionsPanel />
+            <BankConnectionsPanel onBrowseTransactions={onBrowseTransactions} />
+
+            <div className="mb-4 mt-8"><h2 className="text-xl font-semibold">Manual accounts</h2><p className="mt-1 text-sm text-muted-foreground">Balances you manage yourself.</p></div>
 
             {showAddForm && (
                 <Card className="mb-8 border-primary/20 bg-primary/5">
@@ -124,9 +127,9 @@ const AccountsPage: React.FC = () => {
                 <Card>
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                         <Wallet className="h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No Accounts Found</h3>
+                        <h3 className="text-lg font-semibold mb-2">No manual accounts</h3>
                         <p className="text-muted-foreground mb-4 max-w-sm">
-                            You haven't added any accounts yet. Add your first account to start tracking your balances.
+                            Add cash or an account you want to manage manually.
                         </p>
                         <Button onClick={() => setShowAddForm(true)}>
                             Add New Account

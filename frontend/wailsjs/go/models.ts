@@ -270,6 +270,7 @@ export namespace models {
 	    }
 	}
 	export class Bill {
+	    schedule: schedule.Rule;
 	    id: number;
 	    name: string;
 	    amount: number;
@@ -284,6 +285,7 @@ export namespace models {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schedule = this.convertValues(source["schedule"], schedule.Rule);
 	        this.id = source["id"];
 	        this.name = source["name"];
 	        this.amount = source["amount"];
@@ -292,6 +294,24 @@ export namespace models {
 	        this.accountId = source["accountId"];
 	        this.active = source["active"];
 	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class BudgetAllocation {
 	    id: number;
@@ -350,6 +370,112 @@ export namespace models {
 		    }
 		    return a;
 		}
+	}
+	export class ReviewTransaction {
+	    date: string;
+	    institution: string;
+	    description: string;
+	    category: string;
+	    currency: string;
+	    amount: number;
+	    pending: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new ReviewTransaction(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.institution = source["institution"];
+	        this.description = source["description"];
+	        this.category = source["category"];
+	        this.currency = source["currency"];
+	        this.amount = source["amount"];
+	        this.pending = source["pending"];
+	    }
+	}
+	export class BudgetReview {
+	    manualCount: number;
+	    manualPending: number;
+	    manualExpenses: number;
+	    plannedExpenses: number;
+	    importedCount: number;
+	    importedPending: number;
+	    importedExpensesUSD: number;
+	    environment: string;
+	    bankNotice: string;
+	    imported: ReviewTransaction[];
+
+	    static createFrom(source: any = {}) {
+	        return new BudgetReview(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.manualCount = source["manualCount"];
+	        this.manualPending = source["manualPending"];
+	        this.manualExpenses = source["manualExpenses"];
+	        this.plannedExpenses = source["plannedExpenses"];
+	        this.importedCount = source["importedCount"];
+	        this.importedPending = source["importedPending"];
+	        this.importedExpensesUSD = source["importedExpensesUSD"];
+	        this.environment = source["environment"];
+	        this.bankNotice = source["bankNotice"];
+	        this.imported = this.convertValues(source["imported"], ReviewTransaction);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BudgetWindow {
+	    start: string;
+	    end: string;
+
+	    static createFrom(source: any = {}) {
+	        return new BudgetWindow(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.start = source["start"];
+	        this.end = source["end"];
+	    }
+	}
+	export class CalendarEvent {
+	    date: string;
+	    kind: string;
+	    sourceId: number;
+	    name: string;
+	    amount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new CalendarEvent(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.kind = source["kind"];
+	        this.sourceId = source["sourceId"];
+	        this.name = source["name"];
+	        this.amount = source["amount"];
+	    }
 	}
 	export class CashFlowSettings {
 	    // Go type: time
@@ -451,6 +577,45 @@ export namespace models {
 	        this.defaultAmount = source["defaultAmount"];
 	    }
 	}
+	export class IncomeSchedule {
+	    id: number;
+	    name: string;
+	    amount: number;
+	    active: boolean;
+	    schedule: schedule.Rule;
+
+	    static createFrom(source: any = {}) {
+	        return new IncomeSchedule(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.amount = source["amount"];
+	        this.active = source["active"];
+	        this.schedule = this.convertValues(source["schedule"], schedule.Rule);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
 	export class Transaction {
 	    id: number;
 	    // Go type: time
@@ -497,6 +662,29 @@ export namespace models {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace schedule {
+
+	export class Rule {
+	    cadence: string;
+	    anchorDate: string;
+	    secondDay: number;
+	    endDate: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Rule(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cadence = source["cadence"];
+	        this.anchorDate = source["anchorDate"];
+	        this.secondDay = source["secondDay"];
+	        this.endDate = source["endDate"];
+	    }
 	}
 
 }

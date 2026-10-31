@@ -1,3 +1,6 @@
+import { type TransactionFilter } from '@/lib/transactionBrowser';
+import BudgetDateFields from '@/components/BudgetDateFields';
+import BudgetCloseoutPanel from '@/components/BudgetCloseoutPanel';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -39,18 +43,21 @@ import {
   DeleteBudgetAllocation,
   GetBudgetAllocationsByBudgetPeriodID,
   GetBudgetPeriods,
+  AddBudgetPeriod,
   GetCategories,
   UpdateBudgetAllocation,
   UpdateBudgetPeriod,
 	PopulateBudgetPeriodFromDefaults,
 	CloseAndCreateBudgetPeriod,
+  UpdateBudgetPeriodStatus,
 } from '../wailsAdapter';
 
-const BudgetPage: React.FC = () => {
+const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>void}> = ({onBrowseTransactions}) => {
   const [budgetPeriods, setBudgetPeriods] = useState<models.BudgetPeriod[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [closeoutRevision, setCloseoutRevision] = useState(0);
   const [selectedPeriod, setSelectedPeriod] = useState<models.BudgetPeriod | null>(null);
   const [allocations, setAllocations] = useState<models.BudgetAllocation[]>([]);
   const [isLoadingAllocations, setIsLoadingAllocations] = useState<boolean>(false);
@@ -128,9 +135,9 @@ const BudgetPage: React.FC = () => {
 
 	const openHandoff = () => {
 		if (!selectedPeriod) return;
-		const currentEnd = new Date(selectedPeriod.endDate);
+		const currentEnd = new Date(String(selectedPeriod.endDate).slice(0,10)+'T12:00:00');
 		const start = new Date(currentEnd); start.setDate(start.getDate() + 1);
-		const durationDays = Math.max(1, Math.round((currentEnd.getTime() - new Date(selectedPeriod.startDate).getTime()) / 86400000));
+		const durationDays = Math.max(1, Math.round((currentEnd.getTime() - new Date(String(selectedPeriod.startDate).slice(0,10)+'T12:00:00').getTime()) / 86400000));
 		const end = new Date(start); end.setDate(end.getDate() + durationDays);
 		// Budget dates are shown as local calendar days. Do not serialize through
 		// UTC here or evening offsets can advance the suggested period by one day.
@@ -142,7 +149,9 @@ const BudgetPage: React.FC = () => {
 		if (!selectedPeriod) return;
 		setHandoffError(null); setIsHandingOff(true);
 		try {
-			const next = await CloseAndCreateBudgetPeriod(selectedPeriod.id, nextPeriodName, nextPeriodStart, nextPeriodEnd);
+			const next = selectedPeriod.status === 'Closed'
+              ? await AddBudgetPeriod(nextPeriodName, nextPeriodStart, nextPeriodEnd, 'Open')
+              : await CloseAndCreateBudgetPeriod(selectedPeriod.id, nextPeriodName, nextPeriodStart, nextPeriodEnd);
 			await fetchBudgetPeriods(); setSelectedPeriod(next); setIsHandoffOpen(false);
 		} catch (err: any) { setHandoffError(err.message || 'Unable to start the next period'); }
 		finally { setIsHandingOff(false); }
@@ -161,6 +170,7 @@ const BudgetPage: React.FC = () => {
     try {
       const fetchedAllocations = await GetBudgetAllocationsByBudgetPeriodID(selectedPeriod.id);
       setAllocations(fetchedAllocations || []);
+      setCloseoutRevision(v=>v+1);
     } catch (err: any) {
       console.error(`Error fetching allocations for period ${selectedPeriod.id}:`, err);
       setAllocationsError(err.message || 'Failed to fetch allocations');
@@ -305,6 +315,8 @@ const BudgetPage: React.FC = () => {
         </Dialog>
       </div>
 
+      <BudgetCloseoutPanel onBrowseTransactions={onBrowseTransactions} revision={closeoutRevision} periods={budgetPeriods} selected={selectedPeriod} onSelect={handlePeriodSelect} onClosed={()=>void fetchBudgetPeriods()} />
+
       {/* Carousel of Budget Periods */}
       <div className="mb-8">
         {isLoading && <p className="text-muted-foreground">Loading budget periods...</p>}
@@ -337,7 +349,7 @@ const BudgetPage: React.FC = () => {
                   <Edit2 className="h-4 w-4" />
                 </Button>
               </div>
-			  {!showAddAllocationForm && <div className="flex gap-2">{selectedPeriod.status === 'Open' && <Button variant="outline" onClick={openHandoff} size="sm">Start next period</Button>}<Button variant="outline" onClick={populateFromDefaults} size="sm">Populate defaults</Button><Button onClick={() => setShowAddAllocationForm(true)} size="sm"><Plus className="h-4 w-4 mr-2" />Add Envelope</Button></div>}
+			  {!showAddAllocationForm && <div className="flex gap-2">{selectedPeriod.status === 'Closed' && <Button variant="outline" onClick={async()=>{try{await UpdateBudgetPeriodStatus(selectedPeriod.id,'Open');await fetchBudgetPeriods();}catch(e:any){setAllocationsError(e.message||'Unable to reopen budget');}}} size="sm">Reopen for review</Button>}{['Open','Closed'].includes(selectedPeriod.status) && <Button variant="outline" onClick={openHandoff} size="sm">Start next period</Button>}<Button variant="outline" onClick={populateFromDefaults} size="sm">Populate defaults</Button><Button onClick={() => setShowAddAllocationForm(true)} size="sm"><Plus className="h-4 w-4 mr-2" />Add Envelope</Button></div>}
             </CardHeader>
             <CardContent>
               {isLoadingAllocations && <p className="text-muted-foreground">Loading envelopes...</p>}
@@ -453,10 +465,10 @@ const BudgetPage: React.FC = () => {
       {/* Edit Period Dialog */}
 		<Dialog open={isHandoffOpen} onOpenChange={setIsHandoffOpen}>
 		  <DialogContent>
-			<DialogHeader><DialogTitle>Close and start next period</DialogTitle></DialogHeader>
-			<p className="text-sm text-muted-foreground">This closes {selectedPeriod?.name} and creates an editable new period from your category defaults.</p>
+			<DialogHeader><DialogTitle>{selectedPeriod?.status === 'Closed' ? 'Start next period' : 'Close and start next period'}</DialogTitle></DialogHeader>
+			<DialogDescription>{selectedPeriod?.status === 'Closed' ? 'Your reviewed budget stays closed. The next period starts from your category defaults.' : `This closes ${selectedPeriod?.name} and creates an editable new period from your category defaults.`}</DialogDescription>
 			{handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
-			<div className="space-y-4"><div className="space-y-2"><Label htmlFor="next-period-name">New period name</Label><Input id="next-period-name" value={nextPeriodName} onChange={e => setNextPeriodName(e.target.value)} placeholder="e.g., October Budget" /></div><div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="next-period-start">Start</Label><Input id="next-period-start" type="date" value={nextPeriodStart} onChange={e => setNextPeriodStart(e.target.value)} /></div><div className="space-y-2"><Label htmlFor="next-period-end">End</Label><Input id="next-period-end" type="date" value={nextPeriodEnd} onChange={e => setNextPeriodEnd(e.target.value)} /></div></div><Button onClick={completeHandoff} disabled={isHandingOff || !nextPeriodName || !nextPeriodStart || !nextPeriodEnd} className="w-full">{isHandingOff ? 'Starting…' : 'Close current and start next period'}</Button></div>
+			<div className="space-y-4"><div className="space-y-2"><Label htmlFor="next-period-name">New period name</Label><Input id="next-period-name" value={nextPeriodName} onChange={e => setNextPeriodName(e.target.value)} placeholder="e.g., October Budget" /></div><BudgetDateFields prefix="next-period" start={nextPeriodStart} end={nextPeriodEnd} onStart={setNextPeriodStart} onEnd={setNextPeriodEnd} /><Button onClick={completeHandoff} disabled={isHandingOff || !nextPeriodName || !nextPeriodStart || !nextPeriodEnd} className="w-full">{isHandingOff ? 'Starting…' : selectedPeriod?.status === 'Closed' ? 'Create next period' : 'Close current and start next period'}</Button></div>
 		  </DialogContent>
 		</Dialog>
 

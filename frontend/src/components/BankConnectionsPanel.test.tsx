@@ -90,7 +90,7 @@ describe('BankConnectionsPanel', () => {
         await load({ ...emptyView, items: [bank] });
         expect(screen.getByText('$1,250.50')).toBeInTheDocument();
         expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-        expect(screen.getByText(/Importing does not change those amounts/)).toBeInTheDocument();
+        expect(screen.getByText(/Bank imports aren’t included in manual budget totals yet/)).toBeInTheDocument();
 
         await user.click(screen.getByText('Bank and card transactions (1)'));
         const transactions = screen.getByRole('table', { name: 'Test Bank bank and card transactions' });
@@ -167,3 +167,19 @@ describe('BankConnectionsPanel', () => {
     expect(Adapter.CancelBankLink).toHaveBeenCalledWith('abandoned-sign-in');
     expect(screen.getByRole('button', { name: 'Import available updates' })).toBeEnabled();
  });
+
+it('opens the correct institution and account in the transaction workspace',async()=>{
+ const browse=vi.fn();vi.mocked(Adapter.GetBankFeedView).mockResolvedValueOnce({...emptyView,items:[bank]});render(<BankConnectionsPanel onBrowseTransactions={browse}/>);
+ await userEvent.click(await screen.findByRole('button',{name:'View Household checking transactions'}));
+ expect(browse).toHaveBeenCalledWith({source:'connected',itemId:'local-item-1',accountId:'checking'});expect(Adapter.ImportBankFeeds).not.toHaveBeenCalled();
+});
+
+it('keeps investment accounts with investment activity out of bank-history navigation',async()=>{
+ const browse=vi.fn();const investment={...bank.accounts[0],id:'ira',name:'Retirement IRA',type:'investment',subtype:'ira'};
+ vi.mocked(Adapter.GetBankFeedView).mockResolvedValueOnce({...emptyView,items:[{...bank,accounts:[investment],transactions:[],investmentTransactions:[{...bank.investmentTransactions[0],accountId:'ira'}]}]});
+ render(<BankConnectionsPanel onBrowseTransactions={browse}/>);
+ expect(await screen.findByRole('heading',{name:/Retirement IRA/})).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'View Retirement IRA transactions'})).not.toBeInTheDocument();
+ await userEvent.click(screen.getByText('Investment activity (1)'));
+ expect(screen.getByRole('table',{name:'Test Bank investment activity'})).toHaveTextContent('Example fund purchase');expect(browse).not.toHaveBeenCalled();
+});

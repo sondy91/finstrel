@@ -90,6 +90,10 @@ export function GetBudgetPeriods() {
   return window['go']['main']['App']['GetBudgetPeriods']();
 }
 
+export function GetBudgetReview(arg1) {
+  return window['go']['main']['App']['GetBudgetReview'](arg1);
+}
+
 export function GetCashFlowSettings() {
   return window['go']['main']['App']['GetCashFlowSettings']();
 }
@@ -100,6 +104,14 @@ export function GetCashFlowSummary() {
 
 export function GetCategories() {
   return window['go']['main']['App']['GetCategories']();
+}
+
+export function GetIncomeSchedules() {
+  return window['go']['main']['App']['GetIncomeSchedules']();
+}
+
+export function GetPlanningCalendar(arg1, arg2) {
+  return window['go']['main']['App']['GetPlanningCalendar'](arg1, arg2);
 }
 
 export function GetTransactions() {
@@ -116,6 +128,18 @@ export function ImportBankFeeds() {
 
 export function PopulateBudgetPeriodFromDefaults(arg1) {
   return window['go']['main']['App']['PopulateBudgetPeriodFromDefaults'](arg1);
+}
+
+export function PreviewBudgetWindow(arg1, arg2) {
+  return window['go']['main']['App']['PreviewBudgetWindow'](arg1, arg2);
+}
+
+export function SaveBillSchedule(arg1) {
+  return window['go']['main']['App']['SaveBillSchedule'](arg1);
+}
+
+export function SaveIncomeSchedule(arg1) {
+  return window['go']['main']['App']['SaveIncomeSchedule'](arg1);
 }
 
 export function StartBankLink(arg1) {

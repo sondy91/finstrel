@@ -1,3 +1,5 @@
+import { ChevronRight, Building2 } from 'lucide-react';
+import { supportsBankHistory, type TransactionFilter } from '@/lib/transactionBrowser';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -78,7 +80,7 @@ function Pagination({ page, count, onPage, label }: {
     </nav>;
 }
 
-function ConnectionData({ item }: { item: BankFeedItem }) {
+function ConnectionData({ item, onBrowseTransactions }: { item: BankFeedItem; onBrowseTransactions?: (filter: TransactionFilter)=>void }) {
     const selectId = useId();
     const [accountFilter, setAccountFilter] = useState('');
     const [transactionPage, setTransactionPage] = useState(0);
@@ -93,17 +95,8 @@ function ConnectionData({ item }: { item: BankFeedItem }) {
     const accountCurrency = (id: string) => accounts.find(account => account.id === id)?.currency || '';
 
     return <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {accounts.map(account => <div key={account.id} className="rounded-lg border p-4">
-                <h4 className="font-semibold">{account.name}{account.mask ? ` · ••${account.mask}` : ''}</h4>
-                <p className="mb-3 text-xs text-muted-foreground">{account.subtype || account.type}</p>
-                <dl className="space-y-1 text-sm">
-                    <div className="flex justify-between gap-3"><dt>Current balance</dt><dd className="font-medium">{money(account.current, account.currency)}</dd></div>
-                    <div className="flex justify-between gap-3"><dt>Available</dt><dd>{money(account.available, account.currency)}</dd></div>
-                    {account.limit != null && <div className="flex justify-between gap-3"><dt>Credit limit</dt><dd>{money(account.limit, account.currency)}</dd></div>}
-                </dl>
-            </div>)}
-        </div>
+        <div className="overflow-x-auto rounded-md border"><table className="w-full text-left text-sm"><caption className="sr-only">{item.institution} accounts</caption><thead className="bg-muted/30 text-xs text-muted-foreground"><tr><th className="px-4 py-3">Account</th><th className="px-4 py-3 text-right">Balance</th><th className="px-4 py-3 text-right">Available</th><th className="px-4 py-3 text-right">Limit</th></tr></thead><tbody>{accounts.map(account=><tr key={account.id} className="border-t hover:bg-muted/20"><td className="px-4 py-3"><div className="flex items-center gap-3"><Building2 className="h-4 w-4 shrink-0 text-muted-foreground"/><div>{onBrowseTransactions&&supportsBankHistory(account,item.transactions||[])?<button className="flex items-center gap-2 text-left font-medium hover:underline" onClick={()=>onBrowseTransactions({source:'connected',itemId:item.id,accountId:account.id})} aria-label={`View ${account.name} transactions`}>{account.name}{account.mask?` · ••${account.mask}`:''}<ChevronRight className="h-3.5 w-3.5 text-muted-foreground"/></button>:<h4 className="font-medium">{account.name}{account.mask?` · ••${account.mask}`:''}</h4>}<p className="mt-0.5 text-xs text-muted-foreground">{account.subtype||account.type}</p></div></div></td><td className="px-4 py-3 text-right tabular-nums font-medium">{money(account.current,account.currency)}</td><td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{money(account.available,account.currency)}</td><td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{money(account.limit,account.currency)}</td></tr>)}</tbody></table></div>
+        {onBrowseTransactions&&<div className="flex justify-end"><Button variant="ghost" size="sm" onClick={()=>onBrowseTransactions({source:'connected',itemId:item.id})}>View bank transactions <ChevronRight className="ml-1 h-4 w-4"/></Button></div>}
         {!accounts.length && <p className="text-sm text-muted-foreground">No accounts have been imported yet.</p>}
 
         <details className="rounded-lg border p-4">
@@ -172,7 +165,7 @@ function ConnectionData({ item }: { item: BankFeedItem }) {
     </div>;
 }
 
-const BankConnectionsPanel: React.FC = () => {
+const BankConnectionsPanel: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>void}> = ({onBrowseTransactions}) => {
     const [view, setView] = useState<BankFeedView | null>(null);
     const [busy, setBusy] = useState('Loading bank connections…');
     const [error, setError] = useState('');
@@ -249,7 +242,7 @@ const BankConnectionsPanel: React.FC = () => {
             <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h2 id="bank-connections-title" className="text-xl font-semibold">Connected banks</h2>
-                    <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Bring balances, transactions, debt terms, and investments together with Plaid.</p>
+                    <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Balances and history from your linked institutions.</p>
                 </div>
                 {view?.configured && <div className="flex shrink-0 flex-wrap gap-2">
                     <Button variant="outline" disabled={!!busy || !!pendingSession || !items.length} onClick={() => void importFeeds()}>Import available updates</Button>
@@ -258,7 +251,7 @@ const BankConnectionsPanel: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
                 {view?.environment === 'sandbox' && <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm"><strong>Sandbox — test accounts only.</strong> These balances and transactions are simulated.</div>}
-                <p className="text-sm text-muted-foreground">Imported bank data is stored encrypted on this device. Bank connections stay separate from manually entered accounts, budgets, and forecasts. Importing does not change those amounts. Bank figures may lag recent activity.</p>
+                <p className="text-sm text-muted-foreground">Bank imports aren’t included in manual budget totals yet.</p>
                 {view && !view.configured && <p className="rounded-md bg-muted p-3 text-sm">Plaid is not configured yet. Set up the backend Sandbox credentials on this device, then restart the app. Bank sign-in opens in your browser; this app does not ask for your bank password or API keys.</p>}
                 {pendingSession && <div className="space-y-3 rounded-md border p-4">
                     <p className="text-sm">Complete the bank sign-in in your browser, then return here to finish connecting.</p>
@@ -280,7 +273,7 @@ const BankConnectionsPanel: React.FC = () => {
                 </div>
                 <div className="flex shrink-0 gap-2"><Button variant="outline" size="sm" disabled={!!busy || !!pendingSession} onClick={() => void startLink(item.id)} aria-label={`Reconnect ${item.institution || 'institution'}`}>Reconnect</Button><Button variant="ghost" size="sm" disabled={!!busy || !!pendingSession} onClick={() => setDisconnectItem(item)} aria-label={`Disconnect ${item.institution || 'institution'}`}>Disconnect</Button></div>
             </CardHeader>
-            <CardContent><ConnectionData item={item} /></CardContent>
+            <CardContent><ConnectionData item={item} onBrowseTransactions={onBrowseTransactions} /></CardContent>
         </Card>)}
 
         <AlertDialog open={!!disconnectItem} onOpenChange={open => { if (!open) setDisconnectItem(null); }}>

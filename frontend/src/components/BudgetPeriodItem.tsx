@@ -11,7 +11,8 @@ interface BudgetPeriodItemProps {
 
 const BudgetPeriodItem: React.FC<BudgetPeriodItemProps> = ({ period, isSelected, onClick }) => {
   const formatDate = (dateString: string | Date): string => {
-    return new Date(dateString).toLocaleDateString(undefined, {
+    const day = dateString instanceof Date ? dateString.toISOString().slice(0,10) : String(dateString).slice(0,10);
+    return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',

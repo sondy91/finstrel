@@ -1,3 +1,4 @@
+import { getPracticeSession } from './lib/practice';
 // A thin adapter over Wails-generated functions that also falls back to window.go.main.App
 // This stabilizes imports in tests and in environments where the generated module may not be ready.
 
@@ -7,6 +8,8 @@ import * as WailsApp from '../wailsjs/go/main/App';
 
 // Helper to call either window.go.main.App or the imported Wails module
 const call = (fnName: string) => async (...args: any[]) => {
+  const practice = getPracticeSession();
+  if (practice) return await practice.call(fnName, args);
   const winApp = (globalThis as any)?.go?.main?.App;
   if (winApp && typeof winApp[fnName] === 'function') {
     return await winApp[fnName](...args);
@@ -63,3 +66,11 @@ export const FinishBankLink = call('FinishBankLink');
 export const ImportBankFeeds = call('ImportBankFeeds');
 export const DisconnectBankFeed = call('DisconnectBankFeed');
 export const CancelBankLink = call('CancelBankLink');
+
+export const GetIncomeSchedules = call('GetIncomeSchedules');
+export const SaveIncomeSchedule = call('SaveIncomeSchedule');
+export const SaveBillSchedule = call('SaveBillSchedule');
+export const GetPlanningCalendar = call('GetPlanningCalendar');
+export const PreviewBudgetWindow = call('PreviewBudgetWindow');
+export const UpdateBudgetPeriodStatus = call('UpdateBudgetPeriodStatus');
+export const GetBudgetReview = call('GetBudgetReview');

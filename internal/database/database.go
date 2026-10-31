@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"finstrel/internal/models" // Add models import
+	"finstrel/internal/models"
+	"finstrel/internal/schedule" // Add models import
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
@@ -23,7 +24,7 @@ func InitDB() error {
 	// Determine data directory (e.g., in user's config or app data folder)
 	// For simplicity now, we'll place it next to the executable or in the current dir
 	// A more robust solution would use os.UserConfigDir() or similar.
-	dbPath := dbFileName // Place it in the current working directory for now
+	dbPath := dbFileName
 
 	// Check if the database file exists, create directory if needed (though not strictly needed for current path)
 	dbDir := filepath.Dir(dbPath)
@@ -279,6 +280,10 @@ func createTables() error {
 		}
 	}
 
+	if err := createPlanningTables(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
 	err = tx.Commit()
 	if err != nil {
 		log.Printf("Error committing transaction for table creation: %v", err)
@@ -1041,7 +1046,7 @@ func AddBill(bill models.Bill) (models.Bill, error) {
 }
 
 func GetBills() ([]models.Bill, error) {
-	rows, err := GetDB().Query("SELECT id, name, amount, category_id, due_day, account_id, active FROM bills ORDER BY due_day, name")
+	rows, err := GetDB().Query("SELECT b.id, b.name, b.amount, b.category_id, b.due_day, b.account_id, b.active, COALESCE(r.rule, '') FROM bills b LEFT JOIN bill_recurrences r ON r.bill_id=b.id ORDER BY b.due_day, b.name")
 	if err != nil {
 		return nil, err
 	}
@@ -1050,11 +1055,15 @@ func GetBills() ([]models.Bill, error) {
 	for rows.Next() {
 		var bill models.Bill
 		var accountID sql.NullInt64
-		if err := rows.Scan(&bill.ID, &bill.Name, &bill.Amount, &bill.CategoryID, &bill.DueDay, &accountID, &bill.Active); err != nil {
+		var rule string
+		if err := rows.Scan(&bill.ID, &bill.Name, &bill.Amount, &bill.CategoryID, &bill.DueDay, &accountID, &bill.Active, &rule); err != nil {
 			return nil, err
 		}
 		if accountID.Valid {
 			bill.AccountID = &accountID.Int64
+		}
+		if err := decodeBillRule(&bill, rule); err != nil {
+			return nil, err
 		}
 		bills = append(bills, bill)
 	}
@@ -1116,6 +1125,33 @@ func GetCashFlowSummary(now time.Time) (models.CashFlowSummary, error) {
 	if err != nil {
 		return models.CashFlowSummary{}, err
 	}
+	incomes, err := GetIncomeSchedules()
+	if err != nil {
+		return models.CashFlowSummary{}, err
+	}
+	todayString := now.Format(schedule.Layout)
+	var nextIncome string
+	hasActiveIncome := false
+	for _, income := range incomes {
+		if !income.Active {
+			continue
+		}
+		hasActiveIncome = true
+		dates, e := schedule.Dates(income.Schedule, todayString, now.AddDate(2, 0, 0).Format(schedule.Layout))
+		if e != nil {
+			return models.CashFlowSummary{}, e
+		}
+		if len(dates) > 0 && (nextIncome == "" || dates[0] < nextIncome) {
+			nextIncome = dates[0]
+		}
+	}
+	if hasActiveIncome {
+		settings.NextPaycheckDate = nil
+		if nextIncome != "" {
+			d, _ := time.Parse(schedule.Layout, nextIncome)
+			settings.NextPaycheckDate = &d
+		}
+	}
 	summary := models.CashFlowSummary{DesiredCashBuffer: settings.DesiredCashBuffer, NextPaycheckDate: settings.NextPaycheckDate}
 	if err := GetDB().QueryRow("SELECT COALESCE(SUM(current_balance), 0) FROM accounts WHERE include_in_cash_flow = 1").Scan(&summary.CashAvailable); err != nil {
 		return summary, err
@@ -1144,13 +1180,11 @@ func GetCashFlowSummary(now time.Time) (models.CashFlowSummary, error) {
 		if !bill.Active {
 			continue
 		}
-		for month := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC); !month.After(payday); month = month.AddDate(0, 1, 0) {
-			lastDay := month.AddDate(0, 1, -1).Day()
-			due := time.Date(month.Year(), month.Month(), min(bill.DueDay, lastDay), 0, 0, 0, 0, time.UTC)
-			if !due.Before(today) && !due.After(payday) {
-				summary.UpcomingBills += bill.Amount
-			}
+		dates, e := schedule.Dates(bill.Schedule, today.Format(schedule.Layout), payday.Format(schedule.Layout))
+		if e != nil {
+			return summary, e
 		}
+		summary.UpcomingBills += float64(len(dates)) * bill.Amount
 	}
 
 	// Use only the current open budget period. Budget periods remain planning
@@ -1158,7 +1192,7 @@ func GetCashFlowSummary(now time.Time) (models.CashFlowSummary, error) {
 	var periodID int64
 	var start, end string
 	err = GetDB().QueryRow(`SELECT id, start_date, end_date FROM budget_periods
-		WHERE status = 'Open' ORDER BY start_date DESC, id DESC LIMIT 1`).Scan(&periodID, &start, &end)
+		WHERE status = 'Open' AND date(start_date) <= ? AND date(end_date) >= ? ORDER BY start_date DESC, id DESC LIMIT 1`, todayString, todayString).Scan(&periodID, &start, &end)
 	if err != nil && err != sql.ErrNoRows {
 		return summary, err
 	}
@@ -1169,7 +1203,7 @@ func GetCashFlowSummary(now time.Time) (models.CashFlowSummary, error) {
 			JOIN categories c ON c.id = ba.category_id AND c.type = 'Expense'
 			LEFT JOIN (
 				SELECT category_id, SUM(ABS(amount)) amount FROM transactions
-				WHERE type = 'Expense' AND date >= ? AND date <= ? GROUP BY category_id
+				WHERE type = 'Expense' AND date(date) >= date(?) AND date(date) <= date(?) GROUP BY category_id
 			) spent ON spent.category_id = ba.category_id
 			WHERE ba.budget_period_id = ?`, start, end, periodID).Scan(&remaining)
 		if err != nil {
@@ -1207,6 +1241,8 @@ func ClearAllData() error {
 	// Delete in order to respect foreign key constraints
 	tables := []string{
 		"budget_allocations",
+		"bill_recurrences",
+		"income_schedules",
 		"bills",
 		"cash_flow_settings",
 		"transactions",

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 290" role="img" aria-label="Falcon Glide logo">
+  <defs>
+    <linearGradient id="upper" x1="32" y1="151" x2="405" y2="51" gradientUnits="userSpaceOnUse"><stop stop-color="#f1d59a"/><stop offset=".45" stop-color="#a88656"/><stop offset="1" stop-color="#151413"/></linearGradient>
+    <linearGradient id="lower" x1="151" y1="160" x2="296" y2="253" gradientUnits="userSpaceOnUse"><stop stop-color="#151413"/><stop offset="1" stop-color="#e5bf7b"/></linearGradient>
+    <linearGradient id="rear" x1="205" y1="162" x2="326" y2="136" gradientUnits="userSpaceOnUse"><stop stop-color="#30251c"/><stop offset="1" stop-color="#e2bc7a"/></linearGradient>
+    <clipPath id="bird"><path d="M 32 151 C 43 136 56 126 70 127 C 82 127 91 138 103 140 C 106 141 109 141 111 141 C 180 129 262 102 405 51 C 354 94 302 133 233 157 C 257 154 287 147 326 136 C 303 156 277 174 238 175 L 296 253 C 256 224 194 183 151 161 C 120 153 94 137 77 143 C 59 138 42 144 32 151 Z"/></clipPath>
+  </defs>
+  <path d="M 32 151 C 43 136 56 126 70 127 C 82 127 91 138 103 140 C 106 141 109 141 111 141 C 180 129 262 102 405 51 C 354 94 302 133 233 157 C 257 154 287 147 326 136 C 303 156 277 174 238 175 L 296 253 C 256 224 194 183 151 161 C 120 153 94 137 77 143 C 59 138 42 144 32 151 Z" fill="url(#upper)"/>
+  <g clip-path="url(#bird)">
+    <path d="M 151 161 C 179 158 207 150 233 157 L 296 253 Z" fill="url(#lower)"/>
+    <path d="M 205 160 C 251 156 289 146 326 136 C 303 156 277 174 238 175 Z" fill="url(#rear)"/>
+  </g>
+  <path d="M 32 151 C 43 136 56 126 70 127 C 82 127 91 138 103 140 C 106 141 109 141 111 141 C 180 129 262 102 405 51 C 354 94 302 133 233 157 C 257 154 287 147 326 136 C 303 156 277 174 238 175 L 296 253 C 256 224 194 183 151 161 C 120 153 94 137 77 143 C 59 138 42 144 32 151 Z" fill="none" stroke="#f9efda" stroke-width="2" stroke-linejoin="round"/>
+</svg>

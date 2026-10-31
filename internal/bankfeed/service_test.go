@@ -647,3 +647,36 @@ func TestRevokedCredentialIsRetainedUntilMarkerCommits(t *testing.T) {
 		t.Fatal("failed save made disconnect impossible", err)
 	}
 }
+
+func TestReopenExpiredReconnectKeepsExistingItem(t *testing.T) {
+	var linkRequest map[string]any
+	s, _ := fixtureService(t, func(path string, req map[string]any) (int, any) {
+		if path != "/link/token/create" {
+			t.Errorf("unexpected endpoint %s", path)
+			return 500, nil
+		}
+		linkRequest = req
+		return 200, map[string]any{"link_token": "fictional-renewed-link", "expiration": time.Now().Add(time.Hour).UTC(), "hosted_link_url": "https://secure.plaid.com/hl/fixture-renewed"}
+	})
+	seed(t, s, record{})
+	state, err := s.vault.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Session = &linkSession{ID: "expired-reconnect", ItemID: "local-item", Expires: time.Now().Add(-time.Hour)}
+	if err = s.vault.save(state); err != nil {
+		t.Fatal(err)
+	}
+	// The UI's Open sign-in again action passes no Item ID after restart.
+	session, err := s.StartLink(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if linkRequest["access_token"] != "fictional-test-credential" || linkRequest["products"] != nil {
+		t.Fatal("expired reconnect became a new-bank Link flow")
+	}
+	state, err = s.vault.load()
+	if err != nil || state.Session.ItemID != "local-item" || state.Session.ID != session || len(state.Items) != 1 {
+		t.Fatal("renewed reconnect lost the original Item", err)
+	}
+}

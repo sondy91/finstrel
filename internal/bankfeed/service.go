@@ -117,6 +117,11 @@ func (s *Service) StartLink(ctx context.Context, itemID string) (string, error) 
 		}
 		return state.Session.ID, nil
 	}
+	// Reopening an expired update session must retain its original connection.
+	// The UI sends no Item ID for its generic Open sign-in again action.
+	if itemID == "" && state.Session != nil {
+		itemID = state.Session.ItemID
+	}
 	if state.UserID == "" {
 		state.UserID = uuid.NewString()
 	}

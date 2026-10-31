@@ -11,8 +11,8 @@
 
 @layer base {
     :root {
-        color-scheme: dark;
-        --background: 0 0% 100%;
+        color-scheme: light;
+        --background: 0 0% 96.5%;
         --foreground: 0 0% 3.9%;
         --card: 0 0% 100%;
         --card-foreground: 0 0% 3.9%;
@@ -40,24 +40,25 @@
     }
 
     .dark {
-        --background: 0 0% 3.9%;
+        color-scheme: dark;
+        --background: 0 0% 9.4%;
         --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
+        --card: 0 0% 17%;
         --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
+        --popover: 0 0% 17%;
         --popover-foreground: 0 0% 98%;
         --primary: 0 0% 98%;
         --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
+        --secondary: 0 0% 22%;
         --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
+        --muted: 0 0% 22%;
+        --muted-foreground: 0 0% 74%;
+        --accent: 0 0% 25%;
         --accent-foreground: 0 0% 98%;
         --destructive: 0 62.8% 30.6%;
         --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
+        --border: 0 0% 30%;
+        --input: 0 0% 47%;
         --ring: 0 0% 83.1%;
         --chart-1: 220 70% 50%;
         --chart-2: 160 60% 45%;
@@ -70,7 +71,7 @@
     body,
     #root {
         height: 100%;
-        background-color: rgba(27, 38, 54, 1);
+        background-color: hsl(var(--background));
         cursor: default !important;
     }
 

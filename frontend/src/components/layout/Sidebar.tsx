@@ -1,7 +1,7 @@
 import {
+  CalendarDays,
   BarChart3,
   CreditCard,
-  Flame,
   FolderKanban,
   Home,
   Menu,
@@ -13,9 +13,10 @@ import {
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import BrandMark from '@/components/BrandMark';
 import { cn } from '@/lib/utils';
 
-type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings';
+type View = 'Dashboard' | 'Accounts' | 'Categories' | 'Transactions' | 'Budgets' | 'Reports' | 'Settings' | 'Calendar';
 
 interface SidebarProps {
   currentView: View;
@@ -30,6 +31,7 @@ interface MobileSidebarProps extends SidebarProps {
 const navigationItems = [
   { id: 'Dashboard' as View, label: 'Dashboard', icon: Home },
   { id: 'Budgets' as View, label: 'Budgets', icon: Wallet },
+  { id: 'Calendar' as View, label: 'Calendar', icon: CalendarDays },
   { id: 'Accounts' as View, label: 'Accounts', icon: CreditCard },
   { id: 'Transactions' as View, label: 'Transactions', icon: FolderKanban },
   { id: 'Categories' as View, label: 'Categories', icon: Tag },
@@ -41,9 +43,7 @@ function SidebarContent({ currentView, onNavigate, onItemClick }: SidebarProps &
     <>
       {/* Logo/Brand */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
-          <Flame className="h-5 w-5" />
-        </div>
+        <BrandMark className="h-8 w-8" />
         <span className="text-lg font-semibold tracking-tight">Finstrel</span>
       </div>
 
@@ -122,9 +122,7 @@ function MobileSidebar({ currentView, onNavigate, isOpen, onClose }: MobileSideb
         {/* Close button */}
         <div className="flex h-16 items-center justify-between border-b px-6">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
-              <Flame className="h-5 w-5" />
-            </div>
+            <BrandMark className="h-8 w-8" />
             <span className="text-lg font-semibold tracking-tight">Finstrel</span>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -177,9 +175,7 @@ function _LegacySidebar({ currentView, onNavigate }: SidebarProps) {
     <aside className="flex h-screen w-64 flex-col border-r bg-card">
       {/* Logo/Brand */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-primary">
-          <Flame className="h-5 w-5" />
-        </div>
+        <BrandMark className="h-8 w-8" />
         <span className="text-lg font-semibold tracking-tight">Finstrel</span>
       </div>
 

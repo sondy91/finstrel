@@ -1,8 +1,9 @@
-import { Car, Flame, Film, Home, MoonStar, Shield, ShoppingBag, Target, FileText, Sparkles, SunMedium, CreditCard } from 'lucide-react';
+import { Car, Film, Home, MoonStar, Shield, ShoppingBag, Target, FileText, Sparkles, SunMedium, CreditCard } from 'lucide-react';
 import { useState } from 'react';
 
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
+import BrandMark from '@/components/BrandMark';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Steps } from '@/components/ui/steps';
@@ -10,6 +11,7 @@ import { saveOnboardingData } from '@/lib/onboarding';
 
 type WelcomePageProps = {
   onGetStarted: () => void;
+  onPractice?: () => void;
 };
 type OnboardingData = {
   accentColor: string;
@@ -21,12 +23,10 @@ type OnboardingData = {
 
 
 const LogoMark = () => (
-  <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/20 text-primary">
-    <Flame className="h-8 w-8" />
-  </div>
+  <BrandMark className="mx-auto mb-6 h-16 w-16" />
 );
 
-export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
+export default function WelcomePage({ onGetStarted, onPractice }: WelcomePageProps) {
   const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
@@ -186,7 +186,8 @@ export default function WelcomePage({ onGetStarted }: WelcomePageProps) {
               <div className="flex-1 flex flex-col items-center justify-center">
               {currentStep === 1 && (
                 <div className="text-center">
-                  {/* Content only, button moved to bottom */}
+                  <p className="mb-4 max-w-sm text-sm text-muted-foreground">See how a two-week budget works before entering your own numbers.</p>
+                  {onPractice && <Button variant="outline" onClick={onPractice}>Try a practice household</Button>}
                 </div>
               )}
               {currentStep === 2 && (

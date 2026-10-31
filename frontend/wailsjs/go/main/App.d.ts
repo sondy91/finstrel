@@ -47,11 +47,17 @@ export function GetBudgetAllocationsByBudgetPeriodID(arg1:number):Promise<Array<
 
 export function GetBudgetPeriods():Promise<Array<models.BudgetPeriod>>;
 
+export function GetBudgetReview(arg1:number):Promise<models.BudgetReview>;
+
 export function GetCashFlowSettings():Promise<models.CashFlowSettings>;
 
 export function GetCashFlowSummary():Promise<models.CashFlowSummary>;
 
 export function GetCategories():Promise<Array<models.Category>>;
+
+export function GetIncomeSchedules():Promise<Array<models.IncomeSchedule>>;
+
+export function GetPlanningCalendar(arg1:string,arg2:string):Promise<Array<models.CalendarEvent>>;
 
 export function GetTransactions():Promise<Array<models.Transaction>>;
 
@@ -60,6 +66,12 @@ export function Greet(arg1:string):Promise<string>;
 export function ImportBankFeeds():Promise<bankfeed.View>;
 
 export function PopulateBudgetPeriodFromDefaults(arg1:number):Promise<void>;
+
+export function PreviewBudgetWindow(arg1:string,arg2:string):Promise<models.BudgetWindow>;
+
+export function SaveBillSchedule(arg1:models.Bill):Promise<models.Bill>;
+
+export function SaveIncomeSchedule(arg1:models.IncomeSchedule):Promise<models.IncomeSchedule>;
 
 export function StartBankLink(arg1:string):Promise<string>;
 
