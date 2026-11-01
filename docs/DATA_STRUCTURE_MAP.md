@@ -333,17 +333,17 @@ type OnboardingData = {
    // src/lib/onboarding.ts
    const ONBOARDING_COMPLETE_KEY = 'vestra-onboarding-complete';
    const ONBOARDING_DATA_KEY = 'vestra-onboarding-data';
-   
+
    export function saveOnboardingData(data: OnboardingData): void {
      localStorage.setItem(ONBOARDING_DATA_KEY, JSON.stringify(data));
      localStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
    }
-   
+
    export function getOnboardingData(): OnboardingData | null {
      const raw = localStorage.getItem(ONBOARDING_DATA_KEY);
      return raw ? JSON.parse(raw) : null;
    }
-   
+
    export function hasCompletedOnboarding(): boolean {
      return localStorage.getItem(ONBOARDING_COMPLETE_KEY) === 'true';
    }
@@ -361,7 +361,7 @@ type OnboardingData = {
        endOfMonth,
        'Open'
      );
-     
+
      // 2. Create categories from wizard selections
      const categoryMap = {
        groceries: 'Groceries',
@@ -371,14 +371,14 @@ type OnboardingData = {
        entertainment: 'Entertainment',
        savings: 'Savings'
      };
-     
+
      for (const catId of onboardingData.categories) {
        const category = await AddCategory(
          categoryMap[catId],
          'Expense',
          null  // No parent category
        );
-       
+
        // 3. Create $0 allocation for each category
        await AddBudgetAllocation(
          period.id,

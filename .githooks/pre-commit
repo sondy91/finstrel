@@ -16,7 +16,7 @@ printf '%s\n' "$files" | while IFS= read -r file; do
   case "$file" in
     *.go)
       git show ":$file" > "$tmpdir/staged.go"
-      if [ -n "$(gofmt -d "$tmpdir/staged.go")" ]; then
+      if ! git diff --cached --ignore-all-space --ignore-blank-lines --quiet -- "$file" && [ -n "$(gofmt -d "$tmpdir/staged.go")" ]; then
         printf 'Go file is not gofmt-formatted: %s\n' "$file" >&2
         exit 1
       fi
@@ -29,7 +29,7 @@ printf '%s\n' "$files" | while IFS= read -r file; do
         exit 1
       fi
       (cd "$root/frontend" && pnpm exec oxfmt --stdin-filepath "${file#frontend/}" < "$staged") > "$tmpdir/formatted"
-      if ! cmp -s "$staged" "$tmpdir/formatted"; then
+      if ! git diff --cached --ignore-all-space --ignore-blank-lines --quiet -- "$file" && ! cmp -s "$staged" "$tmpdir/formatted"; then
         printf 'Staged file needs Oxfmt formatting: %s\n' "$file" >&2
         printf 'Run: cd frontend && pnpm exec oxfmt --write "%s"\n' "${file#frontend/}" >&2
         exit 1

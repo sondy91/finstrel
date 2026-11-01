@@ -34,7 +34,7 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+
     if (!name || !categoryId || !amount) {
       setError('Please fill in all fields');
       return;
@@ -55,7 +55,7 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
         category_id: categoryId,
         amount: amountValue
       });
-      
+
       onEnvelopeCreated();
       onClose();
     } catch (err) {
@@ -76,7 +76,7 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
               {error}
             </Box>
           )}
-          
+
           <TextField
             autoFocus
             margin="dense"
@@ -89,7 +89,7 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
             disabled={isLoading}
             sx={{ mb: 2 }}
           />
-          
+
           <TextField
             select
             margin="dense"
@@ -110,7 +110,7 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
               </MenuItem>
             ))}
           </TextField>
-          
+
           <TextField
             margin="dense"
             label="Budgeted Amount"
@@ -126,14 +126,14 @@ const EnvelopeForm: React.FC<EnvelopeFormProps> = ({ open, onClose, onEnvelopeCr
             }}
           />
         </DialogContent>
-        
+
         <DialogActions sx={{ p: 2, pt: 0 }}>
           <Button onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             color="primary"
             disabled={isLoading}
           >

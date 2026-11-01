@@ -55,11 +55,11 @@ export default function SettingsPage({onCalendar,onPractice}:{onCalendar?:()=>vo
     try {
       // Clear backend data
       await ClearAllData();
-      
+
       // Clear frontend state
       clearOnboardingData();
       clearBudgetSeeded();
-      
+
       // Reload to reset app state
       window.location.reload();
     } catch (error) {

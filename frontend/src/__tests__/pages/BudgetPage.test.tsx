@@ -74,11 +74,11 @@ describe('BudgetPage', () => {
 
   it('shows allocations when a budget period is selected', async () => {
     render(<BudgetPage />);
-    
+
     // Wait for budget periods to load
     const periodButton = await screen.findByText('August 2025');
     await userEvent.click(periodButton);
-    
+
     // Check if allocations are displayed
     await waitFor(() => {
       expect(screen.getByText('Groceries')).toBeInTheDocument();

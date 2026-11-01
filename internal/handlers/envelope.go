@@ -40,7 +40,7 @@ type CreateEnvelopeRequest struct {
 func (h *EnvelopeHandler) CreateEnvelope(ctx context.Context, req *CreateEnvelopeRequest) (*models.Envelope, error) {
 	// Get category and budget period (you'll need to implement these repository methods)
 	// For now, we'll create a basic envelope
-	
+
 	envelope := &models.Envelope{
 		Name:           req.Name,
 		BudgetedAmount: req.BudgetedAmount,

@@ -42,11 +42,11 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
   }, [allocationToEdit, isEditMode]);
 
   // Filter out categories that are already allocated, UNLESS it's the category of the item being edited.
-  const availableCategories = categories.filter(category => 
+  const availableCategories = categories.filter(category =>
     (isEditMode && allocationToEdit?.categoryId === category.id) || // Always allow the category being edited
     !existingAllocations.some(alloc => alloc.categoryId === category.id)
   );
-  
+
   // Reset category selection if available categories change and not in edit mode, or if switching from edit to add mode.
   useEffect(() => {
     if (!isEditMode) {
@@ -70,7 +70,7 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
       setError('Please enter a valid, non-negative amount.');
       return;
     }
-    
+
     // Prevent adding a duplicate category if NOT in edit mode
     if (!isEditMode && existingAllocations.some(alloc => alloc.categoryId === categoryIdNum)) {
         setError('This category is already allocated for this budget period.');
@@ -104,7 +104,7 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-      
+
       <div className="space-y-2">
         <Label htmlFor="ba-category">Category</Label>
         <Select
@@ -144,8 +144,8 @@ const AddBudgetAllocationForm: React.FC<AddBudgetAllocationFormProps> = ({
         />
       </div>
 
-      <Button 
-        type="submit" 
+      <Button
+        type="submit"
         disabled={isSubmitting || (!isEditMode && availableCategories.length === 0 && !selectedCategoryId)}
         className="w-full"
       >

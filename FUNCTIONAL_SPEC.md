@@ -2,8 +2,8 @@
 
 > Implementation-agnostic specification capturing all functionality of the Finstrel personal finance application as built. This document describes WHAT the app does, not how it's implemented, enabling identical behavior on any technology stack.
 
-**Version:** 1.0  
-**Date:** 2026-04-26  
+**Version:** 1.0
+**Date:** 2026-04-26
 **Status:** Current Implementation
 
 ---
@@ -67,7 +67,7 @@ Single individual managing personal finances with one or two income sources. The
 | **Remaining** | `AllocatedAmount + Σ(transactions.amount)` for the envelope. Since expenses are negative, this correctly yields the unspent budget. |
 
 > **Known issue:** Two parallel envelope models exist in the codebase—`BudgetAllocation` (actively used by UI) and `Envelope` (a richer model with status/lifecycle defined in backend but never wired to UI). Status vocabulary differs: `BudgetPeriod` uses `Open|Closed|Archived`; the unused `Envelope` model uses `active|paused|archived`.
-> 
+>
 > **Suggested improvement:** Pick one model and one casing convention. Either expose the `Envelope` lifecycle (pause/resume/archive) to the UI, or delete the dead `Envelope` model, repository, and handler entirely.
 
 ---
@@ -145,7 +145,7 @@ Upon completing onboarding:
 5. Mark onboarding as complete
 
 > **Known issue:** Starter categories and goal IDs are hardcoded in the client. The seed flow can race with UI rendering, potentially showing partial data.
-> 
+>
 > **Suggested improvement:** Move the preset list to a configuration asset. Gate dashboard rendering on seed completion confirmation.
 
 ---
@@ -199,7 +199,7 @@ Seven primary destinations accessible via persistent navigation:
 - When a transaction is added, the associated account's `currentBalance` is mutated by the transaction amount (atomically with transaction insert)
 
 > **Known issue:** No update-account operation exists. Account types are hardcoded in the UI. Balances are stored as floating-point (precision risk). Deleting an account silently destroys all its transactions even if referenced by budget reports.
-> 
+>
 > **Suggested improvement:** Add account update functionality. Centralize account-type list as configuration. Use fixed-point decimal for money. Consider requiring zero balance or "transfer transactions to another account" before delete.
 
 ---
@@ -229,7 +229,7 @@ Seven primary destinations accessible via persistent navigation:
 - Any category may reference any other as parent (no type constraint)
 
 > **Known issue:** No update or delete operations in the UI. No cycle detection on parent assignment (A→B→A is possible). No depth limit. Nesting an Income category under an Expense is permitted but semantically meaningless.
-> 
+>
 > **Suggested improvement:** Add update/delete with safe-delete semantics (block if referenced by transactions). Validate parent assignments are acyclic. Optionally enforce parent.type == child.type.
 
 ---
@@ -263,7 +263,7 @@ Seven primary destinations accessible via persistent navigation:
 - Amount is color-coded with direction icon: positive (green, arrow-up-right), negative (red, arrow-down-left)
 
 > **Known issue:** No edit, no delete, no filtering, no pagination, no search. Loads entire transaction history into memory. The `type` field is redundant with the amount sign. No way to correct a misposted transaction.
-> 
+>
 > **Suggested improvement:** Add full CRUD with balance reversal on edit/delete inside the same atomic operation. Add server-side pagination and filters (date range, category, account, text search). Drop redundant `type` field or compute it from amount sign.
 
 ---
@@ -302,7 +302,7 @@ Seven primary destinations accessible via persistent navigation:
 - Clicking a period selects it for envelope management
 
 > **Known issue:** No delete operation. No "duplicate previous period" action—every period must be set up from scratch.
-> 
+>
 > **Suggested improvement:** Add delete (with cascade warning for allocations). Add "copy allocations from period X" action.
 
 ---
@@ -354,7 +354,7 @@ Since expenses are negative, this correctly yields: `allocated - spent`.
 - For zero-allocation envelopes: "Not Allocated" label with inline "Allocate" button
 
 > **Known issue:** Spent/Remaining are recomputed client-side from the full transaction list on every render. Color-only status indication is an accessibility concern. No bulk operations (allocate-from-template, copy-from-previous).
-> 
+>
 > **Suggested improvement:** Add server-side aggregate endpoints returning per-envelope spent/remaining. Pair color cues with iconography or text labels for accessibility. Add bulk allocation tooling.
 
 ---
@@ -385,7 +385,7 @@ If onboarding goals exist, display them as chips with human-readable labels.
 - No allocations: Message "No envelopes created yet"
 
 > **Known issue:** Income and Expenses KPIs are all-time, not scoped to the active period. Zero-allocation envelopes require discovering the inline "Allocate" button.
-> 
+>
 > **Suggested improvement:** Default income/expense KPIs to active period with toggle for "All time". Surface a prominent "set up envelopes" empty-state when allocations are uniformly zero.
 
 ---
@@ -407,7 +407,7 @@ If onboarding goals exist, display them as chips with human-readable labels.
 - Tooltip: Dollar amount formatted
 
 > **Known issue:** Months sort lexicographically (e.g., "Apr 2024" before "Feb 2024"), not chronologically. No date-range filter, no budget-vs-actual comparison, no CSV export (despite original MVP requirement). Chart palette is hardcoded and doesn't adapt to dark mode or accent color.
-> 
+>
 > **Suggested improvement:** Sort by actual date. Add date-range picker, category filter, and CSV export. Drive chart colors from the theme system.
 
 ---
@@ -436,7 +436,7 @@ Displays:
 - Privacy note: "All data stored locally on your device"
 
 > **Known issue:** No PIN/password protection (in original MVP scope, never built). No backup/restore (also in original MVP scope, never built). No encryption-at-rest. No data export.
-> 
+>
 > **Suggested improvement:** These were always in scope and gate the "privacy-focused" claim—implement before any public release. At minimum: manual file backup/restore and a PIN-derived key for the data file.
 
 ---
@@ -466,7 +466,7 @@ Theme mode and accent color persist across application restarts via local storag
 Date pickers and other native inputs must respect the selected theme mode.
 
 > **Known issue:** Date inputs only work properly in dark mode via a CSS workaround (`dark:[color-scheme:dark]`). Chart colors don't react to theme or accent selection.
-> 
+>
 > **Suggested improvement:** Use a unified themed input component. Expose accent and text colors as tokens consumed by the chart layer.
 
 ---
@@ -549,7 +549,7 @@ Date pickers and other native inputs must respect the selected theme mode.
 - Deleting a Category: parent reference SET NULL on children (categories still exist); transactions and allocations referencing it are cascaded (deleted)
 
 > **Known issue:** Money is stored as floating-point (precision risk for financial calculations). Status enums aren't centralized—"Open/Closed/Archived" vs "active/paused/archived" coexist.
-> 
+>
 > **Suggested improvement:** Specify money as fixed-point decimal with at least 4 decimal places. Standardize enum casing (recommend PascalCase).
 
 ---
@@ -630,7 +630,7 @@ Status transitions must enforce documented preconditions (e.g., cannot close an 
 - Input validation with clear messaging on all form fields
 
 > **Known issue:** Audit log table is described in the original MVP spec but not implemented. Several error paths use blocking `alert()` dialogs.
-> 
+>
 > **Suggested improvement:** Implement the audit table on every mutation. Replace blocking alerts with toast/snackbar notifications.
 
 ---

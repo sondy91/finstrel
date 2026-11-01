@@ -37,10 +37,10 @@ function getCurrentMonthDates(): { startDate: string; endDate: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
-  
+
   const startDate = new Date(year, month, 1).toISOString();
   const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
-  
+
   return { startDate, endDate };
 }
 
@@ -53,7 +53,7 @@ function getCurrentMonthDates(): { startDate: string; endDate: string } {
 export async function seedInitialBudget(data: OnboardingData): Promise<void> {
   try {
     console.log('Seeding initial budget from onboarding data:', data);
-    
+
 	// 1. Create category templates before the first period.
     for (const categoryId of data.categories) {
       const categoryName = CATEGORY_MAP[categoryId];
@@ -61,7 +61,7 @@ export async function seedInitialBudget(data: OnboardingData): Promise<void> {
         console.warn(`Unknown category ID: ${categoryId}`);
         continue;
       }
-      
+
 		const defaultAmount = data.defaultAmounts?.[categoryId] ?? 0;
       const category = await AddCategoryWithDefault(categoryName, 'Expense', null, defaultAmount);
       console.log(`Created category: ${categoryName}`, category);
@@ -71,7 +71,7 @@ export async function seedInitialBudget(data: OnboardingData): Promise<void> {
 	const { startDate, endDate } = getCurrentMonthDates();
 	const period = await AddBudgetPeriod(getDefaultPeriodName(), startDate, endDate, 'Open');
 	console.log('Created populated budget period:', period);
-    
+
     console.log('Initial budget seeding complete');
   } catch (error) {
     console.error('Failed to seed initial budget:', error);

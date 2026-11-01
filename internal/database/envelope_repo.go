@@ -30,12 +30,12 @@ func (r *EnvelopeRepository) Create(envelope *models.Envelope) error {
 	// Insert the envelope
 	result, err := tx.Exec(`
 		INSERT INTO envelopes (
-			name, 
-			category_id, 
-			budgeted_amount, 
-			budget_period_id, 
-			status, 
-			created_at, 
+			name,
+			category_id,
+			budgeted_amount,
+			budget_period_id,
+			status,
+			created_at,
 			updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		envelope.Name,
@@ -68,8 +68,8 @@ func (r *EnvelopeRepository) GetByID(id int64) (*models.Envelope, error) {
 	var createdAt, updatedAt string
 
 	err := r.db.QueryRow(`
-		SELECT 
-			e.id, e.name, e.category_id, e.budgeted_amount, 
+		SELECT
+			e.id, e.name, e.category_id, e.budgeted_amount,
 			e.budget_period_id, e.status, e.created_at, e.updated_at
 		FROM envelopes e
 		WHERE e.id = ?`, id).
@@ -107,8 +107,8 @@ func (r *EnvelopeRepository) Update(envelope *models.Envelope) error {
 
 	// Update the envelope
 	_, err = tx.Exec(`
-		UPDATE envelopes 
-		SET 
+		UPDATE envelopes
+		SET
 			name = ?,
 			category_id = ?,
 			budgeted_amount = ?,
@@ -152,8 +152,8 @@ func (r *EnvelopeRepository) Delete(id int64) error {
 // ListByBudgetPeriod retrieves all envelopes for a specific budget period
 func (r *EnvelopeRepository) ListByBudgetPeriod(periodID int64) ([]*models.Envelope, error) {
 	rows, err := r.db.Query(`
-		SELECT 
-			e.id, e.name, e.category_id, e.budgeted_amount, 
+		SELECT
+			e.id, e.name, e.category_id, e.budgeted_amount,
 			e.budget_period_id, e.status, e.created_at, e.updated_at
 		FROM envelopes e
 		WHERE e.budget_period_id = ?

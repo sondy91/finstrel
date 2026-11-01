@@ -52,7 +52,7 @@ function SidebarContent({ currentView, onNavigate, onItemClick }: SidebarProps &
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
-          
+
           return (
             <button
               key={item.id}
@@ -112,11 +112,11 @@ function MobileSidebar({ currentView, onNavigate, isOpen, onClose }: MobileSideb
   return (
     <>
       {/* Overlay */}
-      <div 
-        className="fixed inset-0 z-40 bg-black/50 lg:hidden" 
+      <div
+        className="fixed inset-0 z-40 bg-black/50 lg:hidden"
         onClick={onClose}
       />
-      
+
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r bg-card lg:hidden">
         {/* Close button */}
@@ -129,7 +129,7 @@ function MobileSidebar({ currentView, onNavigate, isOpen, onClose }: MobileSideb
             <X className="h-5 w-5" />
           </Button>
         </div>
-        
+
         <div className="flex flex-1 flex-col">
           <SidebarContent currentView={currentView} onNavigate={onNavigate} onItemClick={onClose} />
         </div>
@@ -159,8 +159,8 @@ export default function Sidebar({ currentView, onNavigate }: SidebarProps) {
       <DesktopSidebar currentView={currentView} onNavigate={onNavigate} />
 
       {/* Mobile Sidebar */}
-      <MobileSidebar 
-        currentView={currentView} 
+      <MobileSidebar
+        currentView={currentView}
         onNavigate={onNavigate}
         isOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
@@ -184,7 +184,7 @@ function _LegacySidebar({ currentView, onNavigate }: SidebarProps) {
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentView === item.id;
-          
+
           return (
             <button
               key={item.id}

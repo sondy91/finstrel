@@ -336,8 +336,8 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                       <Button variant="outline" onClick={handleBack}>
                         Back
                       </Button>
-                      <Button 
-                        onClick={handleNext} 
+                      <Button
+                        onClick={handleNext}
                         className="min-w-[120px]"
                         disabled={!canProceed()}
                       >

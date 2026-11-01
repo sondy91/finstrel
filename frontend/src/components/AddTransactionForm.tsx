@@ -258,4 +258,4 @@ const AddTransactionForm: React.FC<AddTransactionFormProps> = ({
     );
 };
 
-export default AddTransactionForm; 
+export default AddTransactionForm;

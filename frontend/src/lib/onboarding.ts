@@ -19,7 +19,7 @@ export type OnboardingData = {
  */
 export function saveOnboardingData(data: OnboardingData): void {
   if (typeof window === 'undefined') return;
-  
+
   try {
     localStorage.setItem(ONBOARDING_DATA_KEY, JSON.stringify(data));
     localStorage.setItem(ONBOARDING_COMPLETE_KEY, 'true');
@@ -33,7 +33,7 @@ export function saveOnboardingData(data: OnboardingData): void {
  */
 export function getOnboardingData(): OnboardingData | null {
   if (typeof window === 'undefined') return null;
-  
+
   try {
     const raw = localStorage.getItem(ONBOARDING_DATA_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -56,7 +56,7 @@ export function hasCompletedOnboarding(): boolean {
  */
 export function clearOnboardingData(): void {
   if (typeof window === 'undefined') return;
-  
+
   localStorage.removeItem(ONBOARDING_DATA_KEY);
   localStorage.removeItem(ONBOARDING_COMPLETE_KEY);
 }
