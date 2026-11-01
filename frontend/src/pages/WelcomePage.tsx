@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import BrandMark from '@/components/BrandMark';
+import BankConnectionsPanel from '@/components/BankConnectionsPanel';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Steps } from '@/components/ui/steps';
@@ -29,6 +30,7 @@ const LogoMark = () => (
 export default function WelcomePage({ onGetStarted, onPractice }: WelcomePageProps) {
   const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   const [currentStep, setCurrentStep] = useState(1);
+  const [withPartner, setWithPartner] = useState<boolean | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
     accentColor,
     themeMode: theme,
@@ -83,21 +85,18 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
 		});
   };
 
-  const steps = [
-    { id: 1, label: 'Welcome' },
-    { id: 2, label: 'Customize' },
-    { id: 3, label: 'Goals' },
-    { id: 4, label: 'Categories' },
-	{ id: 5, label: 'Amounts' },
-  ];
+  const labels = ['Welcome', 'Customize', 'Goals', 'About you', ...(withPartner ? ['Partner'] : []), 'Categories', 'Amounts', 'Connect accounts'];
+  const steps = labels.map((label, index) => ({ id: index + 1, label }));
+  const step = labels[currentStep - 1];
 
   const canProceed = () => {
-    if (currentStep === 3 && onboardingData.goals.length === 0) {
+    if (step === 'Goals' && onboardingData.goals.length === 0) {
       return false;
     }
-    if (currentStep === 4 && onboardingData.categories.length === 0) {
+    if (step === 'Categories' && onboardingData.categories.length === 0) {
       return false;
     }
+    if (step === 'About you' && withPartner === null) return false;
     return true;
   };
 
@@ -138,7 +137,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
           <Card className="w-full max-w-2xl border-border/70 bg-card/80 backdrop-blur">
             <CardHeader className="space-y-4 text-center">
               <LogoMark />
-              {currentStep === 1 && (
+              {step === 'Welcome' && (
                 <div className="space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
                     Welcome to Finstrel
@@ -148,7 +147,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </p>
                 </div>
               )}
-              {currentStep === 2 && (
+              {step === 'Customize' && (
                 <div className="space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
                     Customize your experience
@@ -158,7 +157,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </p>
                 </div>
               )}
-              {currentStep === 3 && (
+              {step === 'Goals' && (
                 <div className="space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
                     What are your goals?
@@ -168,7 +167,10 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </p>
                 </div>
               )}
-              {currentStep === 4 && (
+              {step === 'About you' && <div className="space-y-3"><h1 className="text-3xl font-semibold tracking-tight">Tell us about yourself</h1><p className="text-base text-muted-foreground">Let's set up your household.</p></div>}
+              {step === 'Partner' && <div className="space-y-3"><h1 className="text-3xl font-semibold tracking-tight">Plan together</h1><p className="text-base text-muted-foreground">Your household can use Finstrel together on this device.</p></div>}
+              {step === 'Connect accounts' && <div className="space-y-3"><h1 className="text-3xl font-semibold tracking-tight">Connect an account</h1><p className="text-base text-muted-foreground">Optionally connect a bank to explore your accounts and transactions.</p></div>}
+              {step === 'Categories' && (
                 <div className="space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
                     Choose starter categories
@@ -178,19 +180,19 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </p>
                 </div>
               )}
-			  {currentStep === 5 && (
+			  {step === 'Amounts' && (
 				<div className="space-y-3"><h1 className="text-3xl font-semibold tracking-tight">Set your usual amounts</h1><p className="text-base text-muted-foreground">These defaults will be used for your first and future budget periods.</p></div>
 			  )}
             </CardHeader>
             <CardContent className="flex flex-col min-h-[420px]">
               <div className="flex-1 flex flex-col items-center justify-center">
-              {currentStep === 1 && (
+              {step === 'Welcome' && (
                 <div className="text-center">
                   <p className="mb-4 max-w-sm text-sm text-muted-foreground">See how a two-week budget works before entering your own numbers.</p>
                   {onPractice && <Button variant="outline" onClick={onPractice}>Try a practice household</Button>}
                 </div>
               )}
-              {currentStep === 2 && (
+              {step === 'Customize' && (
                 <div className="w-full">
                   <div className="space-y-3">
                     <label className="block text-sm text-center font-medium">Accent color</label>
@@ -253,7 +255,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </div>
                 </div>
               )}
-              {currentStep === 3 && (
+              {step === 'Goals' && (
                 <div className="w-full max-w-md">
                   <div className="grid grid-cols-1 gap-3">
                     {goalOptions.map((goal) => {
@@ -283,7 +285,10 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </div>
                 </div>
               )}
-              {currentStep === 4 && (
+              {step === 'About you' && <fieldset className="w-full max-w-md space-y-4"><legend className="mb-4 text-center font-medium">Do you manage your finances with a partner?</legend><div className="grid grid-cols-2 gap-3">{[true, false].map(value => <button key={String(value)} type="button" aria-pressed={withPartner === value} onClick={() => setWithPartner(value)} className={`rounded-lg border-2 p-4 font-medium ${withPartner === value ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}>{value ? 'Yes' : 'No'}</button>)}</div></fieldset>}
+              {step === 'Partner' && <div className="max-w-md rounded-lg border bg-muted/30 p-5 text-sm text-muted-foreground"><p className="font-medium text-foreground">Email invitations aren't available yet</p><p className="mt-2">Finstrel keeps your household on this device. You can continue setting up your budget together.</p></div>}
+              {step === 'Connect accounts' && <div className="w-full"><BankConnectionsPanel /></div>}
+              {step === 'Categories' && (
                 <div className="w-full max-w-md">
                   <div className="grid grid-cols-2 gap-3">
                     {starterCategories.map((category) => {
@@ -315,13 +320,13 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                   </div>
                 </div>
               )}
-			  {currentStep === 5 && (
+			  {step === 'Amounts' && (
 				<div className="w-full max-w-md space-y-3">{onboardingData.categories.map(categoryId => { const category = starterCategories.find(item => item.id === categoryId); return <label key={categoryId} className="flex items-center justify-between gap-4 rounded-lg border p-3"><span className="font-medium">{category?.label || categoryId}</span><div className="flex items-center gap-2"><span className="text-sm text-muted-foreground">$</span><Input className="w-28" type="number" min="0" step="0.01" placeholder="0" value={defaultAmountDrafts[categoryId] ?? ''} onChange={e => setDefaultAmountDrafts(prev => ({ ...prev, [categoryId]: e.target.value }))} /></div></label>})}<p className="text-xs text-muted-foreground">Leave an amount blank to use $0.</p></div>
 			  )}
               </div>
               <div className="mt-auto pt-6 space-y-4">
                 <div className="flex gap-3 justify-center">
-                  {currentStep === 1 && (
+                  {step === 'Welcome' && (
                     <Button size="lg" className="min-w-[200px]" onClick={handleNext}>
                       Get started
                     </Button>
@@ -336,11 +341,12 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                         className="min-w-[120px]"
                         disabled={!canProceed()}
                       >
-                        {currentStep === steps.length ? 'Complete' : 'Continue'}
+                        {currentStep === steps.length ? 'Finish setup' : 'Continue'}
                       </Button>
                     </>
                   )}
                 </div>
+                <div className="text-center text-xs text-muted-foreground">Step {currentStep} of {steps.length} · {step}</div>
                 <div className="flex justify-center">
                   <Steps steps={steps} current={currentStep} />
                 </div>

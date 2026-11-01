@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import WelcomePage from '../../pages/WelcomePage';
 import { ThemeProvider } from '../../components/theme/ThemeProvider';
 
+vi.mock('../../components/BankConnectionsPanel', () => ({ default: () => <div>Bank connection controls</div> }));
+
 describe('WelcomePage', () => {
   beforeAll(() => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({
@@ -50,7 +52,7 @@ describe('WelcomePage', () => {
     expect(cta).toBeInTheDocument();
 
     const stepIndicators = screen.getAllByLabelText(/wizard step/i);
-    expect(stepIndicators).toHaveLength(5);
+    expect(stepIndicators).toHaveLength(7);
     expect(stepIndicators[0]).toHaveAttribute('data-active', 'true');
 
     await user.click(cta);
@@ -122,22 +124,42 @@ describe('WelcomePage', () => {
     await user.click(debtGoal);
     expect(debtGoal).not.toHaveClass('border-primary');
   });
-  it('completes all five steps and saves the chosen category amounts', async () => {
+  it('completes setup and saves the chosen category amounts', async () => {
     const {user,onGetStarted}=renderWelcome();
     await user.click(screen.getByRole('button',{name:/get started/i}));
     await user.click(screen.getByRole('button',{name:/continue/i}));
     await user.click(screen.getByLabelText(/select goal: pay off debt/i));
     await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.click(screen.getByRole('button',{name:/^no$/i}));
+    await user.click(screen.getByRole('button',{name:/continue/i}));
     await user.click(screen.getByLabelText(/select category: groceries/i));
     await user.click(screen.getByLabelText(/select category: utilities/i));
     await user.click(screen.getByRole('button',{name:/continue/i}));
     await user.type(screen.getByRole('spinbutton',{name:/groceries/i}),'275.50');
-    await user.click(screen.getByRole('button',{name:/complete/i}));
+    await user.click(screen.getByRole('button',{name:/continue/i}));
+    expect(screen.getByText(/bank connection controls/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:/finish setup/i}));
     expect(onGetStarted).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem('vestra-onboarding-complete')).toBe('true');
     expect(JSON.parse(window.localStorage.getItem('vestra-onboarding-data')!)).toMatchObject({
       goals:['debt'],categories:['groceries','utilities'],defaultAmounts:{groceries:275.5,utilities:0},
     });
+  });
+
+  it('branches for partners and returns to the right step', async () => {
+    const { user } = renderWelcome();
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByLabelText(/select goal: pay off debt/i));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /^yes$/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(screen.getByText(/email invitations aren't available yet/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /back/i }));
+    await user.click(screen.getByRole('button', { name: /^no$/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(screen.getByRole('heading', { name: /choose starter categories/i })).toBeInTheDocument();
   });
 
 });
