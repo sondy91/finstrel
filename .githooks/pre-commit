@@ -1,7 +1,10 @@
 #!/bin/sh
 set -eu
 
-# Check staged content without changing the index or the working tree.
+# Run shared hygiene checks first; fixers stop the commit if they change files.
+pre-commit run --hook-stage pre-commit
+
+# The language checks inspect staged content without changing it.
 git diff --cached --check
 root=$(git rev-parse --show-toplevel)
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/finstrel-hook.XXXXXX")
