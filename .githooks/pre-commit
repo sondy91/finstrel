@@ -1,0 +1,40 @@
+#!/bin/sh
+set -eu
+
+# Check staged content without changing the index or the working tree.
+git diff --cached --check
+root=$(git rev-parse --show-toplevel)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/finstrel-hook.XXXXXX")
+trap 'rm -rf "$tmpdir"' EXIT HUP INT TERM
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+check_go=false
+check_frontend=false
+printf '%s\n' "$files" | while IFS= read -r file; do
+  case "$file" in
+    *.go)
+      git show ":$file" > "$tmpdir/staged.go"
+      if [ -n "$(gofmt -d "$tmpdir/staged.go")" ]; then
+        printf 'Go file is not gofmt-formatted: %s\n' "$file" >&2
+        exit 1
+      fi
+      ;;
+    frontend/src/*.ts|frontend/src/*.tsx)
+      staged="$tmpdir/$(basename "$file")"
+      git show ":$file" > "$staged"
+      if ! (cd "$root/frontend" && pnpm exec oxlint -c "$root/frontend/.oxlintrc.json" --deny-warnings "$staged"); then
+        printf 'Lint failed for staged file: %s\n' "$file" >&2
+        exit 1
+      fi
+      (cd "$root/frontend" && pnpm exec oxfmt --stdin-filepath "${file#frontend/}" < "$staged") > "$tmpdir/formatted"
+      if ! cmp -s "$staged" "$tmpdir/formatted"; then
+        printf 'Staged file needs Oxfmt formatting: %s\n' "$file" >&2
+        printf 'Run: cd frontend && pnpm exec oxfmt --write "%s"\n' "${file#frontend/}" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+case "$(printf '%s\n' "$files" | grep -E '\.go$' || true)" in ?*) check_go=true;; esac
+case "$(printf '%s\n' "$files" | grep -E '^frontend/(src/|package\.json$|pnpm-lock\.yaml$|\.oxlintrc\.json$|\.oxfmtrc\.json$|tsconfig.*\.json$)' || true)" in ?*) check_frontend=true;; esac
+if "$check_go"; then go vet ./...; fi
+if "$check_frontend"; then (cd "$root/frontend" && pnpm typecheck); fi
