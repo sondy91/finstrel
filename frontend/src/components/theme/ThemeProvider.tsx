@@ -62,13 +62,17 @@ const ACCENT_COLORS: Record<string, { hsl: string; rgb: string }> = {
   green: { hsl: '160 84% 39%', rgb: '16 185 129' },
   purple: { hsl: '271 81% 56%', rgb: '168 85 247' },
   pink: { hsl: '330 81% 60%', rgb: '236 72 153' },
+  gold: { hsl: '37 48% 34%', rgb: '128 96 45' },
 };
 
-const applyAccent = (color: string) => {
+const applyAccent = (color: string, theme: Theme) => {
   if (typeof document === 'undefined') {
     return;
   }
-  const accent = ACCENT_COLORS[color] || ACCENT_COLORS.indigo;
+  const accent =
+    color === 'gold' && theme === 'dark'
+      ? { hsl: '38 67% 69%', rgb: '229 191 123' }
+      : ACCENT_COLORS[color] || ACCENT_COLORS.indigo;
   const root = document.documentElement;
   root.style.setProperty('--primary', accent.hsl);
   root.style.setProperty('--primary-rgb', accent.rgb);
@@ -87,7 +91,7 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
   const [accentColor, setAccentColorState] = useState<string>(() => {
     const initialAccent = readInitialAccent();
-    applyAccent(initialAccent);
+    applyAccent(initialAccent, readInitialTheme());
     return initialAccent;
   });
 
@@ -99,11 +103,11 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   }, [theme]);
 
   useEffect(() => {
-    applyAccent(accentColor);
+    applyAccent(accentColor, theme);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(ACCENT_STORAGE_KEY, accentColor);
     }
-  }, [accentColor]);
+  }, [accentColor, theme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);

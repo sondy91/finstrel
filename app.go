@@ -2,14 +2,16 @@ package main
 
 import (
 	"context"
+	"finstrel/internal/bankfeed"
+	"finstrel/internal/database"
+	"finstrel/internal/models"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
 	"time"
-	"finstrel/internal/bankfeed"
-	"finstrel/internal/database"
-	"finstrel/internal/models"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -76,6 +78,19 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	// Bank sync must not block opening the app or touch a pending Link session.
+	go func() {
+		service, err := a.bankService()
+		if err == nil {
+			syncCtx, cancel := a.bankContext()
+			defer cancel()
+			_, err = service.AutoImport(syncCtx)
+		}
+		if err != nil {
+			log.Printf("Automatic bank sync could not complete: %v", err)
+		}
+		runtime.EventsEmit(ctx, "bank-feeds-updated")
+	}()
 }
 
 // shutdown is called when the app terminates.

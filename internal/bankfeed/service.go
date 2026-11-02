@@ -247,7 +247,8 @@ func (s *Service) FinishLink(ctx context.Context, sessionID string) (View, error
 			}
 			return View{}, errors.New("Bank sign-in was not completed. Start a new connection when you are ready.")
 		}
-		return View{}, errors.New("Sign-in is still in progress. Finish in your browser, then choose I finished sign-in again.")
+		// An unfinished sign-in is a normal state while the browser is open.
+		return s.view(state), nil
 	}
 	supportID("link_session_id", lastSessionID)
 	if session.ItemID != "" {
@@ -427,8 +428,51 @@ func (s *Service) Import(ctx context.Context) (View, error) {
 	return s.importState(ctx, state)
 }
 
+// AutoImport runs once on launch, without interrupting a pending Link session.
+func (s *Service) AutoImport(ctx context.Context) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.vault.load()
+	if err != nil {
+		return View{}, err
+	}
+	if s.provider == nil || state.Session != nil || len(state.Items) == 0 {
+		return s.view(state), nil
+	}
+	return s.importState(ctx, state)
+}
+
+// ImportItem updates only the selected connection.
+func (s *Service) ImportItem(ctx context.Context, itemID string) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ready(); err != nil {
+		return View{}, err
+	}
+	state, err := s.vault.load()
+	if err != nil {
+		return View{}, err
+	}
+	if state.Session != nil {
+		return View{}, errors.New("Finish or cancel the current bank sign-in before importing updates.")
+	}
+	for _, record := range state.Items {
+		if record.Item.ID == itemID && !record.Revoked {
+			return s.importSelected(ctx, state, itemID)
+		}
+	}
+	return View{}, errors.New("This bank connection is no longer available. Refresh and try again.")
+}
+
 func (s *Service) importState(ctx context.Context, state snapshot) (View, error) {
+	return s.importSelected(ctx, state, "")
+}
+
+func (s *Service) importSelected(ctx context.Context, state snapshot, itemID string) (View, error) {
 	for i, old := range state.Items {
+		if itemID != "" && old.Item.ID != itemID {
+			continue
+		}
 		if old.Revoked {
 			if err := s.vault.deleteToken(old.Item.ID); err != nil {
 				return View{}, err

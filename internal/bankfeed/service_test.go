@@ -378,8 +378,8 @@ func TestPendingSessionResumesAfterRestartAndClearsCancelledSession(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.FinishLink(context.Background(), session); err == nil {
-		t.Fatal("unfinished session accepted")
+	if pending, err := s.FinishLink(context.Background(), session); err != nil || pending.PendingSession != session || len(pending.Items) != 0 {
+		t.Fatalf("unfinished session should remain pending: %+v, %v", pending, err)
 	}
 	v, err := s.View()
 	if err != nil || v.PendingSession != session {

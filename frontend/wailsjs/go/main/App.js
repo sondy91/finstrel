@@ -122,6 +122,10 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function ImportBankFeed(arg1) {
+  return window['go']['main']['App']['ImportBankFeed'](arg1);
+}
+
 export function ImportBankFeeds() {
   return window['go']['main']['App']['ImportBankFeeds']();
 }

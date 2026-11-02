@@ -63,6 +63,8 @@ export function GetTransactions():Promise<Array<models.Transaction>>;
 
 export function Greet(arg1:string):Promise<string>;
 
+export function ImportBankFeed(arg1:string):Promise<bankfeed.View>;
+
 export function ImportBankFeeds():Promise<bankfeed.View>;
 
 export function PopulateBudgetPeriodFromDefaults(arg1:number):Promise<void>;

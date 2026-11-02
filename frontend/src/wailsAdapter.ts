@@ -7,19 +7,21 @@ import { getPracticeSession } from './lib/practice';
 import * as WailsApp from '../wailsjs/go/main/App';
 
 // Helper to call either window.go.main.App or the imported Wails module
-const call = (fnName: string) => async (...args: any[]) => {
-  const practice = getPracticeSession();
-  if (practice) return await practice.call(fnName, args);
-  const winApp = (globalThis as any)?.go?.main?.App;
-  if (winApp && typeof winApp[fnName] === 'function') {
-    return await winApp[fnName](...args);
-  }
-  const modFn = (WailsApp as any)[fnName];
-  if (typeof modFn === 'function') {
-    return await modFn(...args);
-  }
-  throw new Error(`Wails adapter: function not available: ${fnName}`);
-};
+const call =
+  (fnName: string) =>
+  async (...args: any[]) => {
+    const practice = getPracticeSession();
+    if (practice) return await practice.call(fnName, args);
+    const winApp = (globalThis as any)?.go?.main?.App;
+    if (winApp && typeof winApp[fnName] === 'function') {
+      return await winApp[fnName](...args);
+    }
+    const modFn = (WailsApp as any)[fnName];
+    if (typeof modFn === 'function') {
+      return await modFn(...args);
+    }
+    throw new Error(`Wails adapter: function not available: ${fnName}`);
+  };
 
 // Export the specific functions currently used by the app
 export const GetAccounts = call('GetAccounts');
@@ -64,6 +66,8 @@ export const GetBankFeedView = call('GetBankFeedView');
 export const StartBankLink = call('StartBankLink');
 export const FinishBankLink = call('FinishBankLink');
 export const ImportBankFeeds = call('ImportBankFeeds');
+export const ImportBankFeed = call('ImportBankFeed');
+
 export const DisconnectBankFeed = call('DisconnectBankFeed');
 export const CancelBankLink = call('CancelBankLink');
 

@@ -1,38 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Search,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import AddTransactionForm from "@/components/AddTransactionForm";
-import { type BankFeedView } from "@/components/BankConnectionsPanel";
-import {
-  GetAccounts,
-  GetBankFeedView,
-  GetCategories,
-  GetTransactions,
-} from "@/wailsAdapter";
-import { models } from "../../wailsjs/go/models";
-import { dayLabel, errorText } from "@/lib/planning";
+} from '@/components/ui/dialog';
+import AddTransactionForm from '@/components/AddTransactionForm';
+import { type BankFeedView } from '@/components/BankConnectionsPanel';
+import { GetAccounts, GetBankFeedView, GetCategories, GetTransactions } from '@/wailsAdapter';
+import { models } from '../../wailsjs/go/models';
+import { dayLabel, errorText } from '@/lib/planning';
+import { onBankFeedsUpdated } from '@/lib/bankUpdates';
 import {
   bankMoney,
   categoryLabel,
   supportsBankHistory,
   type TransactionFilter,
-} from "@/lib/transactionBrowser";
+} from '@/lib/transactionBrowser';
 
 type Row = {
   key: string;
@@ -47,42 +37,38 @@ type Row = {
   currency: string;
   pending: boolean;
   notes: string;
-  source: "connected" | "manual";
+  source: 'connected' | 'manual';
 };
 const PAGE_SIZE = 25;
 
-export default function TransactionsPage({
-  initialFilter,
-}: {
-  initialFilter?: TransactionFilter;
-}) {
+export default function TransactionsPage({ initialFilter }: { initialFilter?: TransactionFilter }) {
   const [manual, setManual] = useState<models.Transaction[]>([]);
   const [accounts, setAccounts] = useState<models.Account[]>([]);
   const [categories, setCategories] = useState<models.Category[]>([]);
   const [feeds, setFeeds] = useState<BankFeedView | null>(null);
-  const [source, setSource] = useState<"connected" | "manual">(
-    initialFilter?.source || "connected",
+  const [source, setSource] = useState<'connected' | 'manual'>(
+    initialFilter?.source || 'connected'
   );
   const [accountKey, setAccountKey] = useState(
     initialFilter?.itemId
       ? JSON.stringify(
           initialFilter.accountId
             ? [initialFilter.itemId, initialFilter.accountId]
-            : [initialFilter.itemId],
+            : [initialFilter.itemId]
         )
-      : "",
+      : ''
   );
-  const [search, setSearch] = useState("");
-  const [from, setFrom] = useState(initialFilter?.from || "");
-  const [to, setTo] = useState(initialFilter?.to || "");
+  const [search, setSearch] = useState('');
+  const [from, setFrom] = useState(initialFilter?.from || '');
+  const [to, setTo] = useState(initialFilter?.to || '');
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Row | null>(null);
   const [adding, setAdding] = useState(false);
   const [manualLoading, setManualLoading] = useState(true);
   const [bankLoading, setBankLoading] = useState(true);
-  const loading = source === "connected" ? bankLoading : manualLoading;
-  const [manualError, setManualError] = useState("");
-  const [bankError, setBankError] = useState("");
+  const loading = source === 'connected' ? bankLoading : manualLoading;
+  const [manualError, setManualError] = useState('');
+  const [bankError, setBankError] = useState('');
   const mounted = useRef(true);
   const loadNumber = useRef(0);
   const firstLoad = useRef(true);
@@ -91,17 +77,13 @@ export default function TransactionsPage({
     const active = () => mounted.current && version === loadNumber.current;
     setManualLoading(true);
     setBankLoading(true);
-    const ledger = Promise.all([
-      GetTransactions(),
-      GetCategories(),
-      GetAccounts(),
-    ])
+    const ledger = Promise.all([GetTransactions(), GetCategories(), GetAccounts()])
       .then(([tx, cats, acc]) => {
         if (!active()) return;
         setManual(tx || []);
         setCategories(cats || []);
         setAccounts(acc || []);
-        setManualError("");
+        setManualError('');
       })
       .catch((reason) => {
         if (active()) {
@@ -116,9 +98,8 @@ export default function TransactionsPage({
       .then((value: BankFeedView) => {
         if (!active()) return;
         setFeeds(value);
-        setBankError("");
-        if (firstLoad.current && !initialFilter && !(value.items || []).length)
-          setSource("manual");
+        setBankError('');
+        if (firstLoad.current && !initialFilter && !(value.items || []).length) setSource('manual');
         firstLoad.current = false;
       })
       .catch((reason: unknown) => {
@@ -136,7 +117,11 @@ export default function TransactionsPage({
   useEffect(() => {
     mounted.current = true;
     void load();
+    const unsubscribe = onBankFeedsUpdated(() => {
+      void load();
+    });
     return () => {
+      unsubscribe();
       mounted.current = false;
       loadNumber.current++;
     };
@@ -151,48 +136,44 @@ export default function TransactionsPage({
         description: tx.description,
         category: categoryLabel(tx.category),
         account: account
-          ? `${account.name}${account.mask ? ` · ••${account.mask}` : ""}`
-          : "Unavailable account",
+          ? `${account.name}${account.mask ? ` · ••${account.mask}` : ''}`
+          : 'Unavailable account',
         accountKey: JSON.stringify([item.id, tx.accountId]),
         institution: item.institution,
         amount: tx.amount,
         currency: tx.currency,
         pending: tx.pending,
-        notes: "",
-        source: "connected" as const,
+        notes: '',
+        source: 'connected' as const,
       };
-    }),
+    })
   );
   const manualRows: Row[] = manual.map((tx) => ({
     key: `manual-${tx.id}`,
     id: String(tx.id),
     date: String(tx.date).slice(0, 10),
     description: tx.description,
-    category:
-      categories.find((c) => c.id === tx.categoryId)?.name || "Uncategorized",
-    account:
-      accounts.find((a) => a.id === tx.accountId)?.name ||
-      "Unavailable account",
+    category: categories.find((c) => c.id === tx.categoryId)?.name || 'Uncategorized',
+    account: accounts.find((a) => a.id === tx.accountId)?.name || 'Unavailable account',
     accountKey: String(tx.accountId),
-    institution: "Manual ledger",
+    institution: 'Manual ledger',
     amount: tx.amount,
-    currency: "USD",
-    pending: tx.status === "Pending",
-    notes: tx.notes || "",
-    source: "manual",
+    currency: 'USD',
+    pending: tx.status === 'Pending',
+    notes: tx.notes || '',
+    source: 'manual',
   }));
-  const sourceRows = source === "connected" ? connectedRows : manualRows;
+  const sourceRows = source === 'connected' ? connectedRows : manualRows;
   const accountOptions = new Map<string, string>();
-  if (source === "connected") {
+  if (source === 'connected') {
     for (const item of feeds?.items || []) {
-      accountOptions.set(
-        JSON.stringify([item.id]),
-        `All accounts — ${item.institution}`,
-      );
-      for (const a of (item.accounts || []).filter(a=>supportsBankHistory(a,item.transactions||[])))
+      accountOptions.set(JSON.stringify([item.id]), `All accounts — ${item.institution}`);
+      for (const a of (item.accounts || []).filter((a) =>
+        supportsBankHistory(a, item.transactions || [])
+      ))
         accountOptions.set(
           JSON.stringify([item.id, a.id]),
-          `${a.name}${a.mask ? ` · ••${a.mask}` : ""} — ${item.institution}`,
+          `${a.name}${a.mask ? ` · ••${a.mask}` : ''} — ${item.institution}`
         );
     }
   } else {
@@ -202,7 +183,7 @@ export default function TransactionsPage({
     .filter(
       (r) =>
         (!accountKey ||
-          (source === "connected" && JSON.parse(accountKey).length === 1
+          (source === 'connected' && JSON.parse(accountKey).length === 1
             ? JSON.parse(r.accountKey)[0] === JSON.parse(accountKey)[0]
             : r.accountKey === accountKey)) &&
         (!from || r.date >= from) &&
@@ -210,13 +191,10 @@ export default function TransactionsPage({
         (!search ||
           `${r.description} ${r.category} ${r.account} ${r.institution}`
             .toLowerCase()
-            .includes(search.toLowerCase())),
+            .includes(search.toLowerCase()))
     )
     .sort((a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key));
-  const currentPage = Math.min(
-    page,
-    Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1),
-  );
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(rows.length / PAGE_SIZE) - 1));
   const totals = new Map<string, { incoming: number; outgoing: number }>();
   for (const r of rows) {
     const t = totals.get(r.currency) || { incoming: 0, outgoing: 0 };
@@ -224,17 +202,17 @@ export default function TransactionsPage({
     else t.outgoing -= r.amount;
     totals.set(r.currency, t);
   }
-  const error = source === "connected" ? bankError : manualError;
-  const changeSource = (value: "connected" | "manual") => {
+  const error = source === 'connected' ? bankError : manualError;
+  const changeSource = (value: 'connected' | 'manual') => {
     setSource(value);
-    setAccountKey("");
+    setAccountKey('');
     setPage(0);
   };
   const reset = () => {
-    setAccountKey("");
-    setSearch("");
-    setFrom("");
-    setTo("");
+    setAccountKey('');
+    setSearch('');
+    setFrom('');
+    setTo('');
     setPage(0);
   };
   return (
@@ -252,36 +230,28 @@ export default function TransactionsPage({
         </Button>
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-        <div
-          className="flex gap-1"
-          role="group"
-          aria-label="Transaction source"
-        >
+        <div className="flex gap-1" role="group" aria-label="Transaction source">
           <Button
-            variant={source === "connected" ? "secondary" : "ghost"}
-            aria-pressed={source === "connected"}
-            onClick={() => changeSource("connected")}
+            variant={source === 'connected' ? 'secondary' : 'ghost'}
+            aria-pressed={source === 'connected'}
+            onClick={() => changeSource('connected')}
           >
-            Connected accounts{" "}
-            <span className="ml-2 text-xs text-muted-foreground">
-              {connectedRows.length}
-            </span>
+            Connected accounts{' '}
+            <span className="ml-2 text-xs text-muted-foreground">{connectedRows.length}</span>
           </Button>
           <Button
-            variant={source === "manual" ? "secondary" : "ghost"}
-            aria-pressed={source === "manual"}
-            onClick={() => changeSource("manual")}
+            variant={source === 'manual' ? 'secondary' : 'ghost'}
+            aria-pressed={source === 'manual'}
+            onClick={() => changeSource('manual')}
           >
-            Manual ledger{" "}
-            <span className="ml-2 text-xs text-muted-foreground">
-              {manualRows.length}
-            </span>
+            Manual ledger{' '}
+            <span className="ml-2 text-xs text-muted-foreground">{manualRows.length}</span>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          {source === "connected"
-            ? `${feeds?.environment === "sandbox" ? "Test bank data · " : ""}Imports aren’t included in budget totals yet.`
-            : "Manual entries update your budget and balances."}
+          {source === 'connected'
+            ? `${feeds?.environment === 'sandbox' ? 'Test bank data · ' : ''}Imports aren’t included in budget totals yet.`
+            : 'Manual entries update your budget and balances.'}
         </p>
       </div>
       <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[1.4fr_1.3fr_1fr_1fr_auto]">
@@ -357,7 +327,7 @@ export default function TransactionsPage({
           role="alert"
           className="rounded border border-destructive/30 p-3 text-sm text-destructive"
         >
-          {error}{" "}
+          {error}{' '}
           <Button variant="outline" onClick={() => void load()}>
             Retry
           </Button>
@@ -376,9 +346,9 @@ export default function TransactionsPage({
             <div className="p-10 text-center">
               <h2 className="font-semibold">No transactions match</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {source === "connected"
-                  ? "Import bank updates in Accounts, or adjust your filters."
-                  : "Add an entry or adjust your filters."}
+                {source === 'connected'
+                  ? 'Import bank updates in Accounts, or adjust your filters.'
+                  : 'Add an entry or adjust your filters.'}
               </p>
             </div>
           ) : (
@@ -386,10 +356,7 @@ export default function TransactionsPage({
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <caption className="sr-only">
-                    {source === "connected"
-                      ? "Connected account"
-                      : "Manual ledger"}{" "}
-                    transactions
+                    {source === 'connected' ? 'Connected account' : 'Manual ledger'} transactions
                   </caption>
                   <thead className="bg-muted/40 text-xs text-muted-foreground">
                     <tr>
@@ -401,49 +368,40 @@ export default function TransactionsPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows
-                      .slice(
-                        currentPage * PAGE_SIZE,
-                        (currentPage + 1) * PAGE_SIZE,
-                      )
-                      .map((r) => (
-                        <tr key={r.key} className="border-t hover:bg-muted/30">
-                          <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                            {dayLabel(r.date)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-primary"
-                              onClick={() => setSelected(r)}
-                              aria-label={`View transaction ${r.description}`}
-                            >
-                              {r.description}
-                            </button>
-                            {r.pending && (
-                              <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-300">
-                                Pending
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground">
-                            {r.category}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="block">{r.account}</span>
-                            {source === "connected" && (
-                              <span className="text-xs text-muted-foreground">
-                                {r.institution}
-                              </span>
-                            )}
-                          </td>
-                          <td
-                            className={`whitespace-nowrap px-4 py-3 text-right tabular-nums font-medium ${r.amount > 0 ? "text-emerald-700 dark:text-emerald-300" : ""}`}
+                    {rows.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE).map((r) => (
+                      <tr key={r.key} className="border-t hover:bg-muted/30">
+                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                          {dayLabel(r.date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            className="text-left font-medium underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-primary"
+                            onClick={() => setSelected(r)}
+                            aria-label={`View transaction ${r.description}`}
                           >
-                            {r.amount > 0 ? "+" : ""}
-                            {bankMoney(r.amount, r.currency)}
-                          </td>
-                        </tr>
-                      ))}
+                            {r.description}
+                          </button>
+                          {r.pending && (
+                            <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-300">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{r.category}</td>
+                        <td className="px-4 py-3">
+                          <span className="block">{r.account}</span>
+                          {source === 'connected' && (
+                            <span className="text-xs text-muted-foreground">{r.institution}</span>
+                          )}
+                        </td>
+                        <td
+                          className={`whitespace-nowrap px-4 py-3 text-right tabular-nums font-medium ${r.amount > 0 ? 'text-emerald-700 dark:text-emerald-300' : ''}`}
+                        >
+                          {r.amount > 0 ? '+' : ''}
+                          {bankMoney(r.amount, r.currency)}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -455,9 +413,8 @@ export default function TransactionsPage({
               aria-label="Transaction pages"
             >
               <span>
-                {currentPage * PAGE_SIZE + 1}–
-                {Math.min((currentPage + 1) * PAGE_SIZE, rows.length)} of{" "}
-                {rows.length}
+                {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, rows.length)}{' '}
+                of {rows.length}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -489,7 +446,7 @@ export default function TransactionsPage({
           <h2 className="font-semibold">This selection</h2>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Transactions</span>
-            <strong>{loading ? "—" : rows.length}</strong>
+            <strong>{loading ? '—' : rows.length}</strong>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Pending</span>
@@ -498,7 +455,7 @@ export default function TransactionsPage({
           {Array.from(totals).map(([currency, t]) => (
             <div key={currency} className="space-y-2 border-t pt-3 text-sm">
               <span className="text-xs text-muted-foreground">
-                {currency || "Currency unknown"}
+                {currency || 'Currency unknown'}
               </span>
               <div className="flex justify-between gap-2">
                 <span>Money in</span>
@@ -508,16 +465,12 @@ export default function TransactionsPage({
               </div>
               <div className="flex justify-between gap-2">
                 <span>Money out</span>
-                <span className="tabular-nums">
-                  {bankMoney(t.outgoing, currency)}
-                </span>
+                <span className="tabular-nums">{bankMoney(t.outgoing, currency)}</span>
               </div>
             </div>
           ))}
           {rows.some((r) => r.pending) && (
-            <p className="text-xs text-muted-foreground">
-              Includes pending transactions.
-            </p>
+            <p className="text-xs text-muted-foreground">Includes pending transactions.</p>
           )}
         </aside>
       </div>
@@ -529,11 +482,11 @@ export default function TransactionsPage({
       >
         <DialogContent className="left-auto right-0 top-0 flex h-full max-h-screen translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-lg sm:rounded-none">
           <DialogHeader>
-            <DialogTitle>{selected?.description || "Transaction"}</DialogTitle>
+            <DialogTitle>{selected?.description || 'Transaction'}</DialogTitle>
             <DialogDescription>
-              {selected?.source === "connected"
-                ? "Connected account transaction"
-                : "Manual ledger entry"}
+              {selected?.source === 'connected'
+                ? 'Connected account transaction'
+                : 'Manual ledger entry'}
             </DialogDescription>
           </DialogHeader>
           {selected && (
@@ -542,22 +495,17 @@ export default function TransactionsPage({
                 <p className="text-3xl font-semibold tabular-nums">
                   {bankMoney(selected.amount, selected.currency)}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selected.account}
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{selected.account}</p>
               </div>
               <dl className="space-y-4 text-sm">
                 {[
-                  ["Date", dayLabel(selected.date)],
-                  ["Category", selected.category],
-                  ["Institution", selected.institution],
-                  ["Status", selected.pending ? "Pending" : "Posted"],
-                  ["Currency", selected.currency || "Unknown"],
+                  ['Date', dayLabel(selected.date)],
+                  ['Category', selected.category],
+                  ['Institution', selected.institution],
+                  ['Status', selected.pending ? 'Pending' : 'Posted'],
+                  ['Currency', selected.currency || 'Unknown'],
                 ].map(([k, v]) => (
-                  <div
-                    key={k}
-                    className="flex justify-between gap-4 border-b pb-3"
-                  >
+                  <div key={k} className="flex justify-between gap-4 border-b pb-3">
                     <dt className="text-muted-foreground">{k}</dt>
                     <dd className="text-right">{v}</dd>
                   </div>
@@ -566,9 +514,7 @@ export default function TransactionsPage({
               {selected.notes && (
                 <div>
                   <h3 className="text-sm font-medium">Notes</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {selected.notes}
-                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">{selected.notes}</p>
                 </div>
               )}
               <Button
@@ -576,21 +522,17 @@ export default function TransactionsPage({
                 onClick={() => {
                   setSource(selected.source);
                   setAccountKey(selected.accountKey);
-                  setSearch("");
+                  setSearch('');
                   setPage(0);
                   setSelected(null);
                 }}
               >
-                View this account’s transactions{" "}
-                <ArrowUpRight className="ml-2 h-4 w-4" />
+                View this account’s transactions <ArrowUpRight className="ml-2 h-4 w-4" />
               </Button>
-              {selected.source === "connected" && (
+              {selected.source === 'connected' && (
                 <p className="text-xs text-muted-foreground">
-                  {feeds?.environment === "sandbox"
-                    ? "Simulated bank data. "
-                    : ""}
-                  Imported history is read-only and remains separate from manual
-                  budget totals.
+                  {feeds?.environment === 'sandbox' ? 'Simulated bank data. ' : ''}
+                  Imported history is read-only and remains separate from manual budget totals.
                 </p>
               )}
             </div>
@@ -610,8 +552,8 @@ export default function TransactionsPage({
             accounts={accounts}
             onTransactionAdded={() => {
               setAdding(false);
-              setSource("manual");
-              setAccountKey("");
+              setSource('manual');
+              setAccountKey('');
               void load();
             }}
           />

@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"time"
 	"finstrel/internal/bankfeed"
+	"time"
 
 	"github.com/pkg/browser"
 )
@@ -83,4 +83,15 @@ func (a *App) DisconnectBankFeed(itemID string) (bankfeed.View, error) {
 	ctx, cancel := a.bankContext()
 	defer cancel()
 	return s.Disconnect(ctx, itemID)
+}
+
+// ImportBankFeed refreshes one linked institution without affecting others.
+func (a *App) ImportBankFeed(itemID string) (bankfeed.View, error) {
+	s, err := a.bankService()
+	if err != nil {
+		return bankfeed.View{}, err
+	}
+	ctx, cancel := a.bankContext()
+	defer cancel()
+	return s.ImportItem(ctx, itemID)
 }

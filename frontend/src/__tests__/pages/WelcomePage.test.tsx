@@ -5,19 +5,24 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import WelcomePage from '../../pages/WelcomePage';
 import { ThemeProvider } from '../../components/theme/ThemeProvider';
 
-vi.mock('../../components/BankConnectionsPanel', () => ({ default: () => <div>Bank connection controls</div> }));
+vi.mock('../../components/BankConnectionsPanel', () => ({
+  default: () => <div>Bank connection controls</div>,
+}));
 
 describe('WelcomePage', () => {
   beforeAll(() => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({
-      matches: true,
-      media: '(prefers-color-scheme: dark)',
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })));
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        media: '(prefers-color-scheme: dark)',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }))
+    );
   });
 
   afterAll(() => {
@@ -41,12 +46,8 @@ describe('WelcomePage', () => {
   it('renders hero copy and primary action', async () => {
     const { user } = renderWelcome();
 
-    expect(
-      screen.getByRole('heading', { name: /welcome to finstrel/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/plan budgets and track envelopes/i)
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome to finstrel/i })).toBeInTheDocument();
+    expect(screen.getByText(/plan budgets and track envelopes/i)).toBeInTheDocument();
 
     const cta = screen.getByRole('button', { name: /get started/i });
     expect(cta).toBeInTheDocument();
@@ -93,6 +94,16 @@ describe('WelcomePage', () => {
     expect(continueBtn).toBeInTheDocument();
   });
 
+  it('offers a logo-inspired gold accent in both themes', async () => {
+    const { user } = renderWelcome();
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByLabelText(/select gold accent/i));
+    expect(window.localStorage.getItem('vestra-accent')).toBe('gold');
+    expect(document.documentElement.style.getPropertyValue('--primary')).toBe('38 67% 69%');
+    await user.click(screen.getByRole('button', { name: /light/i }));
+    expect(document.documentElement.style.getPropertyValue('--primary')).toBe('37 48% 34%');
+  });
+
   it('navigates back from step 2 to step 1', async () => {
     const { user } = renderWelcome();
 
@@ -125,24 +136,26 @@ describe('WelcomePage', () => {
     expect(debtGoal).not.toHaveClass('border-primary');
   });
   it('completes setup and saves the chosen category amounts', async () => {
-    const {user,onGetStarted}=renderWelcome();
-    await user.click(screen.getByRole('button',{name:/get started/i}));
-    await user.click(screen.getByRole('button',{name:/continue/i}));
+    const { user, onGetStarted } = renderWelcome();
+    await user.click(screen.getByRole('button', { name: /get started/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
     await user.click(screen.getByLabelText(/select goal: pay off debt/i));
-    await user.click(screen.getByRole('button',{name:/continue/i}));
-    await user.click(screen.getByRole('button',{name:/^no$/i}));
-    await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.click(screen.getByRole('button', { name: /^no$/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
     await user.click(screen.getByLabelText(/select category: groceries/i));
     await user.click(screen.getByLabelText(/select category: utilities/i));
-    await user.click(screen.getByRole('button',{name:/continue/i}));
-    await user.type(screen.getByRole('spinbutton',{name:/groceries/i}),'275.50');
-    await user.click(screen.getByRole('button',{name:/continue/i}));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    await user.type(screen.getByRole('spinbutton', { name: /groceries/i }), '275.50');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(screen.getByText(/bank connection controls/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button',{name:/finish setup/i}));
+    await user.click(screen.getByRole('button', { name: /finish setup/i }));
     expect(onGetStarted).toHaveBeenCalledOnce();
     expect(window.localStorage.getItem('vestra-onboarding-complete')).toBe('true');
     expect(JSON.parse(window.localStorage.getItem('vestra-onboarding-data')!)).toMatchObject({
-      goals:['debt'],categories:['groceries','utilities'],defaultAmounts:{groceries:275.5,utilities:0},
+      goals: ['debt'],
+      categories: ['groceries', 'utilities'],
+      defaultAmounts: { groceries: 275.5, utilities: 0 },
     });
   });
 
@@ -161,5 +174,4 @@ describe('WelcomePage', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(screen.getByRole('heading', { name: /choose starter categories/i })).toBeInTheDocument();
   });
-
 });
