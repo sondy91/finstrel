@@ -38,7 +38,7 @@ If you are on Ubuntu 24.04, when running you can use `libwebkit2gtk-4.1-dev`, ch
 
 ## Local checks and Git hooks
 
-Install Go, Node.js, pnpm, Python 3, pre-commit, and Gitleaks (for example, `brew install pre-commit gitleaks` on macOS), then run `pnpm install --frozen-lockfile` in `frontend`.
+Install Go 1.26 or newer, Wails CLI 2.17.1, Node.js, pnpm, Python 3, pre-commit, and Gitleaks (for example, `brew install pre-commit gitleaks` on macOS), then run `pnpm install --frozen-lockfile` in `frontend`.
 Enable the versioned hook once per clone:
 
 ```sh
