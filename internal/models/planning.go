@@ -27,6 +27,7 @@ type BudgetReview struct {
 	SpentByCategory          map[int64]float64   `json:"spentByCategory"`
 	UncategorizedCount       int                 `json:"uncategorizedCount"`
 	UnsupportedCurrencyCount int                 `json:"unsupportedCurrencyCount"`
+	PossibleBankOverlap      bool                `json:"possibleBankOverlap"`
 	ManualCount              int                 `json:"manualCount"`
 	ManualPending            int                 `json:"manualPending"`
 	ManualExpenses           float64             `json:"manualExpenses"`

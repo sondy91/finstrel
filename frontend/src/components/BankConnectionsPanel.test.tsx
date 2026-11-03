@@ -344,7 +344,7 @@ describe('BankConnectionsPanel', () => {
     await load({ ...emptyView, items: [bank] });
     await user.click(screen.getByRole('button', { name: 'Disconnect Test Bank' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent(
-      'Those transactions will no longer count in your budgets.'
+      'Imported transactions stay in your budget and transaction history.'
     );
     await user.click(screen.getByRole('button', { name: 'Keep connected' }));
     expect(Adapter.DisconnectBankFeed).not.toHaveBeenCalled();

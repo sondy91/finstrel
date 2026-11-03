@@ -95,7 +95,7 @@ func (v *vault) load() (snapshot, error) {
 		return state, errStorage
 	}
 	plain, err := aead.Open(nil, data[4:4+aead.NonceSize()], data[4+aead.NonceSize():], []byte(v.namespace))
-	if err != nil || json.Unmarshal(plain, &state) != nil || state.Version != 1 {
+	if err != nil || json.Unmarshal(plain, &state) != nil || (state.Version != 1 && state.Version != 2) {
 		return snapshot{}, errStorage
 	}
 	return state, nil

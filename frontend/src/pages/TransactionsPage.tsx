@@ -106,7 +106,13 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         if (!active()) return;
         setFeeds(value);
         setBankError('');
-        if (firstLoad.current && !initialFilter && !(value.items || []).length) setSource('manual');
+        if (
+          firstLoad.current &&
+          !initialFilter &&
+          !(value.items || []).length &&
+          !(value.archivedItems || []).length
+        )
+          setSource('manual');
         firstLoad.current = false;
       })
       .catch((reason: unknown) => {
@@ -133,7 +139,8 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
       loadNumber.current++;
     };
   }, []);
-  const connectedRows: Row[] = (feeds?.items || []).flatMap((item) =>
+  const allBankItems = [...(feeds?.items || []), ...(feeds?.archivedItems || [])];
+  const connectedRows: Row[] = allBankItems.flatMap((item) =>
     (item.transactions || []).map((tx) => {
       const account = item.accounts.find((a) => a.id === tx.accountId);
       return {
@@ -149,7 +156,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
           ? `${account.name}${account.mask ? ` · ••${account.mask}` : ''}`
           : 'Unavailable account',
         accountKey: JSON.stringify([item.id, tx.accountId]),
-        institution: item.institution,
+        institution: `${item.institution}${item.status === 'disconnected' ? ' · Disconnected' : ''}`,
         amount: tx.amount,
         currency: tx.currency,
         pending: tx.pending,
@@ -176,7 +183,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
   const sourceRows = source === 'connected' ? connectedRows : manualRows;
   const accountOptions = new Map<string, string>();
   if (source === 'connected') {
-    for (const item of feeds?.items || []) {
+    for (const item of allBankItems) {
       accountOptions.set(JSON.stringify([item.id]), `All accounts — ${item.institution}`);
       for (const a of (item.accounts || []).filter((a) =>
         supportsBankHistory(a, item.transactions || [])

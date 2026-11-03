@@ -78,6 +78,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       ? copy({
           ...cached,
           pendingSession: '',
+          archivedItems: [],
           items: (cached.items || []).map((item) => ({
             ...item,
             accounts: item.accounts || [],

@@ -160,8 +160,9 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 		return result, nil
 	}
 	result.Environment = feeds.Environment
+	result.PossibleBankOverlap = len(feeds.Items) > 0 && len(feeds.ArchivedItems) > 0
 	result.BankNotice = "Available bank history may be incomplete. Manual entries and bank transactions may overlap."
-	for _, item := range feeds.Items {
+	for _, item := range append(feeds.Items, feeds.ArchivedItems...) {
 		for _, tx := range item.Transactions {
 			if tx.Date < start || tx.Date > end {
 				continue

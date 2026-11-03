@@ -89,6 +89,7 @@ export interface BankFeedView {
   configured: boolean;
   environment: string;
   items: BankFeedItem[];
+  archivedItems?: BankFeedItem[];
   pendingSession?: string;
 }
 
@@ -475,8 +476,8 @@ const BankConnectionsPanel: React.FC<{
               Disconnect {disconnectItem?.institution || 'this institution'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This revokes access and deletes imported bank data. Those transactions will no longer
-              count in your budgets.
+              This revokes access. Imported transactions stay in your budget and transaction
+              history. If you connect again, review for duplicate transactions.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

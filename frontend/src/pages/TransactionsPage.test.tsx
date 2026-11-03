@@ -121,6 +121,19 @@ it('can exclude a bank transaction from budget totals', async () => {
   expect(api.SetBankTransactionExcluded).toHaveBeenCalledWith('alpha', 'same-id', true);
   expect(screen.getByRole('checkbox', { name: 'Include in budget' })).not.toBeChecked();
 });
+it('shows disconnected bank history when there are no active banks', async () => {
+  vi.mocked(api.GetBankFeedView).mockResolvedValue({
+    configured: true,
+    environment: 'sandbox',
+    items: [],
+    archivedItems: [{ ...alpha, status: 'disconnected' }],
+  });
+  render(<TransactionsPage />);
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'View transaction Grocery store' })
+  );
+  expect(screen.getByRole('dialog')).toHaveTextContent('Alpha Bank · Disconnected');
+});
 it('keeps connected/manual records and currencies separate', async () => {
   const user = userEvent.setup();
   render(<TransactionsPage />);

@@ -9,6 +9,7 @@ type View struct {
 	Environment    string `json:"environment"`
 	PendingSession string `json:"pendingSession"`
 	Items          []Item `json:"items"`
+	ArchivedItems  []Item `json:"archivedItems"`
 }
 
 type Item struct {
@@ -103,8 +104,9 @@ type linkSession struct {
 }
 
 type snapshot struct {
-	Version int          `json:"version"`
-	UserID  string       `json:"userId"`
-	Items   []record     `json:"items"`
-	Session *linkSession `json:"session,omitempty"`
+	Version       int          `json:"version"`
+	UserID        string       `json:"userId"`
+	Items         []record     `json:"items"`
+	ArchivedItems []Item       `json:"archivedItems,omitempty"`
+	Session       *linkSession `json:"session,omitempty"`
 }

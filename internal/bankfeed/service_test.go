@@ -209,6 +209,44 @@ func TestTransactionCategoryPersistsInSnapshot(t *testing.T) {
 	}
 }
 
+func TestDisconnectRetainsEditableTransactionHistory(t *testing.T) {
+	s, _ := fixtureService(t, func(path string, _ map[string]any) (int, any) {
+		if path == "/item/remove" {
+			return 200, map[string]any{"request_id": "fixture"}
+		}
+		return apiFailure("UNEXPECTED")
+	})
+	amount := 123.0
+	r := record{Item: emptyItem("local-item", "Fixture Bank")}
+	r.Item.Accounts = []Account{{ID: "checking", Name: "Checking", Current: &amount}}
+	r.Item.Transactions = []Transaction{{ID: "purchase", AccountID: "checking", Amount: -35, Currency: "USD", BudgetCategoryID: 7}}
+	seed(t, s, r)
+	view, err := s.Disconnect(context.Background(), "local-item")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Items) != 0 || len(view.ArchivedItems) != 1 || view.ArchivedItems[0].Transactions[0].BudgetCategoryID != 7 {
+		t.Fatalf("history not retained: %+v", view)
+	}
+	if view.ArchivedItems[0].Accounts[0].Current != nil {
+		t.Fatal("balance retained in archive")
+	}
+	if _, err := s.vault.token("local-item"); err == nil {
+		t.Fatal("access token retained")
+	}
+	state, err := s.vault.load()
+	if err != nil || state.Version != 2 {
+		t.Fatalf("archive version not persisted: %+v %v", state, err)
+	}
+	if _, err = s.SetTransactionExcluded("local-item", "purchase", true); err != nil {
+		t.Fatal(err)
+	}
+	view, err = s.View()
+	if err != nil || !view.ArchivedItems[0].Transactions[0].ExcludeFromBudget {
+		t.Fatal("archived transaction not editable", err)
+	}
+}
+
 func TestFailedPageKeepsCommittedDataAndCursor(t *testing.T) {
 	s, _ := fixtureService(t, func(path string, req map[string]any) (int, any) {
 		if path == "/accounts/get" {

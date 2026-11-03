@@ -20,6 +20,7 @@ type Review = {
   spentByCategory: Record<string, number>;
   uncategorizedCount: number;
   unsupportedCurrencyCount: number;
+  possibleBankOverlap: boolean;
   plannedExpenses: number;
   importedCount: number;
   importedPending: number;
@@ -208,6 +209,11 @@ export default function BudgetCloseoutPanel({
                   {review.unsupportedCurrencyCount > 0 && (
                     <span className="rounded bg-amber-500/10 px-2 py-1 text-xs">
                       {review.unsupportedCurrencyCount} non-USD excluded
+                    </span>
+                  )}
+                  {review.possibleBankOverlap && (
+                    <span className="rounded bg-amber-500/10 px-2 py-1 text-xs">
+                      Connected and disconnected history may overlap
                     </span>
                   )}
                   {review.environment === 'sandbox' && (

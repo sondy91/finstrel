@@ -35,10 +35,10 @@ func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
 			{Date: "2020-01-23", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID, ExcludeFromBudget: true},
 			{Date: "2020-01-24", Currency: "USD", Amount: -25, ExcludeFromBudget: true},
 			{Date: "2020-02-01", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID},
-		}}}}, nil
+		}}}, ArchivedItems: []bankfeed.Item{{Transactions: []bankfeed.Transaction{{Date: "2020-01-20", Currency: "USD", Amount: -10, BudgetCategoryID: category.ID}}}}}, nil
 	})
 	require.NoError(t, err)
-	require.Equal(t, 30.0, review.SpentByCategory[category.ID])
+	require.Equal(t, 40.0, review.SpentByCategory[category.ID])
 	require.Equal(t, 1, review.UncategorizedCount)
 }
 func TestScheduledWritesRejectInvalidAmountsAndIncomeCategories(t *testing.T) {

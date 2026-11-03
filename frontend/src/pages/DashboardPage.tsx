@@ -70,6 +70,8 @@ export default function DashboardPage(_props: { onNavigate?: (view: 'Budgets') =
             warnings.push(`${review.unsupportedCurrencyCount} non-USD transactions excluded`);
           if (review.manualCount && review.importedCount)
             warnings.push('Manual and bank transactions may overlap');
+          if (review.possibleBankOverlap)
+            warnings.push('Disconnected and connected bank transactions may overlap');
           setReviewWarnings(warnings);
         }
         setSummary(cashFlow);

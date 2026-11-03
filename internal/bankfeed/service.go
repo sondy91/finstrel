@@ -62,7 +62,7 @@ func New(openURL func(string) error) (*Service, error) {
 }
 
 func (s *Service) view(state snapshot) View {
-	v := View{Configured: s.provider != nil, Environment: s.environment, Items: []Item{}}
+	v := View{Configured: s.provider != nil, Environment: s.environment, Items: []Item{}, ArchivedItems: state.ArchivedItems}
 	if state.Session != nil {
 		v.PendingSession = state.Session.ID
 	}
@@ -100,6 +100,21 @@ func (s *Service) updateTransaction(itemID, transactionID string, update func(*T
 	}
 	for i := range state.Items {
 		item := &state.Items[i].Item
+		if item.ID != itemID {
+			continue
+		}
+		for j := range item.Transactions {
+			if item.Transactions[j].ID == transactionID {
+				update(&item.Transactions[j])
+				if err := s.vault.save(state); err != nil {
+					return View{}, err
+				}
+				return s.view(state), nil
+			}
+		}
+	}
+	for i := range state.ArchivedItems {
+		item := &state.ArchivedItems[i]
 		if item.ID != itemID {
 			continue
 		}
@@ -902,6 +917,19 @@ func (s *Service) Disconnect(ctx context.Context, itemID string) (View, error) {
 		}
 		if err = s.vault.deleteToken(itemID); err != nil {
 			return View{}, err
+		}
+		if len(r.Item.Transactions) > 0 {
+			archive := emptyItem(r.Item.ID, r.Item.Institution)
+			archive.Status = "disconnected"
+			archive.Transactions = r.Item.Transactions
+			archive.Accounts = append([]Account(nil), r.Item.Accounts...)
+			for j := range archive.Accounts {
+				archive.Accounts[j].Current = nil
+				archive.Accounts[j].Available = nil
+				archive.Accounts[j].Limit = nil
+			}
+			state.ArchivedItems = append(state.ArchivedItems, archive)
+			state.Version = 2
 		}
 		state.Items = append(state.Items[:i], state.Items[i+1:]...)
 		if state.Session != nil && state.Session.ItemID == itemID {
