@@ -88,6 +88,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
           })),
         })
       : { configured: false, environment: 'sandbox', items: [] };
+  const hasPlaidData = feeds.items.length > 0;
   feeds.items.forEach((item) =>
     item.transactions.forEach((transaction) => {
       transaction.budgetCategoryId = 0;
@@ -107,6 +108,53 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
         liability.nextPaymentDate = day(7) + liability.nextPaymentDate.slice(10);
     })
   );
+  feeds.items.push({
+    id: 'practice-example-bank',
+    institution: 'Example bank',
+    status: 'connected',
+    lastImported: '',
+    notice: '',
+    accounts: [
+      {
+        id: 'practice-example-checking',
+        name: 'Example checking',
+        mask: '1234',
+        type: 'depository',
+        subtype: 'checking',
+        currency: 'USD',
+        current: null,
+        available: null,
+        limit: null,
+      },
+    ],
+    transactions: [
+      {
+        id: 'practice-example-groceries',
+        accountId: 'practice-example-checking',
+        date: day(-5),
+        description: 'Example grocery purchase',
+        currency: 'USD',
+        category: 'FOOD_AND_DRINK_GROCERIES',
+        amount: -35,
+        pending: false,
+        budgetCategoryId: 1,
+      },
+      {
+        id: 'practice-example-dinner',
+        accountId: 'practice-example-checking',
+        date: day(-3),
+        description: 'Example dinner',
+        currency: 'USD',
+        category: 'FOOD_AND_DRINK_RESTAURANT',
+        amount: -24,
+        pending: false,
+        budgetCategoryId: 0,
+      },
+    ],
+    liabilities: [],
+    holdings: [],
+    investmentTransactions: [],
+  });
   let nextId = 100;
   const categories: Category[] = [
     { id: 1, name: 'Groceries', type: 'Expense', defaultAmount: 350, parentCategoryId: null },
@@ -350,7 +398,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
     },
   };
   return {
-    hasPlaidData: feeds.items.length > 0,
+    hasPlaidData,
     reset: (): PracticeSession => createPracticeSession(cached),
     async call(name: string, args: any[]) {
       const action = actions[name];
