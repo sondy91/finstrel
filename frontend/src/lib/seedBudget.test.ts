@@ -11,6 +11,24 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+it('uses the chosen first period rather than the current month', async () => {
+  await seedInitialBudget({
+    accentColor: '',
+    themeMode: 'dark',
+    goals: [],
+    categories: [],
+    defaultAmounts: {},
+    budgetStartDate: '2026-10-23',
+    budgetEndDate: '2026-11-05',
+  });
+  expect(AddBudgetPeriod).toHaveBeenLastCalledWith(
+    'October 2026 Budget',
+    '2026-10-23',
+    '2026-11-05',
+    'Open'
+  );
+});
+
 it('creates the initial budget with calendar dates through the last day of the month', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 10, 2, 12));

@@ -22,8 +22,8 @@ const CATEGORY_MAP: Record<string, string> = {
 /**
  * Generate default budget period name for current month
  */
-function getDefaultPeriodName(): string {
-  const now = new Date();
+function getDefaultPeriodName(startDate?: string): string {
+  const now = startDate ? new Date(`${startDate}T12:00:00`) : new Date();
   const monthNames = [
     'January',
     'February',
@@ -79,8 +79,15 @@ export async function seedInitialBudget(data: OnboardingData): Promise<void> {
     }
 
     // 2. New periods copy all saved category defaults.
-    const { startDate, endDate } = getCurrentMonthDates();
-    const period = await AddBudgetPeriod(getDefaultPeriodName(), startDate, endDate, 'Open');
+    const fallback = getCurrentMonthDates();
+    const startDate = data.budgetStartDate || fallback.startDate;
+    const endDate = data.budgetEndDate || fallback.endDate;
+    const period = await AddBudgetPeriod(
+      getDefaultPeriodName(startDate),
+      startDate,
+      endDate,
+      'Open'
+    );
     console.log('Created populated budget period:', period);
 
     console.log('Initial budget seeding complete');

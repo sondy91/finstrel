@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { PreviewBudgetWindow } from "@/wailsAdapter";
-import { errorText } from "@/lib/planning";
+import { useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
+import { PreviewBudgetWindow } from '@/wailsAdapter';
+import { errorText } from '@/lib/planning';
 
 export default function BudgetDateFields({
   prefix,
@@ -11,20 +11,27 @@ export default function BudgetDateFields({
   end,
   onStart,
   onEnd,
+  cadence: controlledCadence,
+  onCadenceChange,
+  showHint = true,
 }: {
   prefix: string;
   start: string;
   end: string;
   onStart: (v: string) => void;
   onEnd: (v: string) => void;
+  cadence?: string;
+  onCadenceChange?: (v: string) => void;
+  showHint?: boolean;
 }) {
-  const [cadence, setCadence] = useState("biweekly");
-  const [error, setError] = useState("");
+  const [localCadence, setLocalCadence] = useState('biweekly');
+  const cadence = controlledCadence ?? localCadence;
+  const [error, setError] = useState('');
   useEffect(() => {
     let active = true;
-    setError("");
-    if (cadence === "custom" || !start) return;
-    onEnd("");
+    setError('');
+    if (cadence === 'custom' || !start) return;
+    onEnd('');
     PreviewBudgetWindow(start, cadence)
       .then((v: { end: string }) => {
         if (active) onEnd(v.end);
@@ -43,13 +50,13 @@ export default function BudgetDateFields({
         <Select
           id={`${prefix}-cadence`}
           value={cadence}
-          onChange={(e) => setCadence(e.target.value)}
+          onChange={(e) =>
+            onCadenceChange ? onCadenceChange(e.target.value) : setLocalCadence(e.target.value)
+          }
         >
           <option value="weekly">Weekly (7 days)</option>
           <option value="biweekly">Every 2 weeks (14 days)</option>
-          <option value="semimonthly">
-            Twice monthly (1–15 and 16–month end)
-          </option>
+          <option value="semimonthly">Twice monthly (1–15 and 16–month end)</option>
           <option value="monthly">Monthly</option>
           <option value="custom">Custom dates</option>
         </Select>
@@ -72,7 +79,7 @@ export default function BudgetDateFields({
             type="date"
             required
             value={end}
-            readOnly={cadence !== "custom"}
+            readOnly={cadence !== 'custom'}
             onChange={(e) => onEnd(e.target.value)}
           />
         </div>
@@ -82,11 +89,12 @@ export default function BudgetDateFields({
           {error}
         </p>
       )}
-      <p className="text-xs text-muted-foreground">
-        Category defaults are copied as amounts for this whole budget, without
-        prorating. Review them when changing period length. Income schedules
-        stay independent.
-      </p>
+      {showHint && (
+        <p className="text-xs text-muted-foreground">
+          Category defaults are copied as amounts for this whole budget, without prorating. Review
+          them when changing period length. Income schedules stay independent.
+        </p>
+      )}
     </div>
   );
 }

@@ -18,10 +18,12 @@ import { useTheme } from '@/components/theme/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import BrandMark from '@/components/BrandMark';
 import BankConnectionsPanel from '@/components/BankConnectionsPanel';
+import BudgetDateFields from '@/components/BudgetDateFields';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Steps } from '@/components/ui/steps';
 import { saveOnboardingData } from '@/lib/onboarding';
+import { dateKey } from '@/lib/planning';
 
 type WelcomePageProps = {
   onGetStarted: () => void;
@@ -33,6 +35,8 @@ type OnboardingData = {
   goals: string[];
   categories: string[];
   defaultAmounts: Record<string, number>;
+  budgetStartDate?: string;
+  budgetEndDate?: string;
 };
 
 const LogoMark = () => <BrandMark className="mx-auto mb-6 h-32 w-32" />;
@@ -51,6 +55,15 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
   // Keep amount entry as text so a controlled number input can be cleared
   // before it is normalized to a safe value on completion.
   const [defaultAmountDrafts, setDefaultAmountDrafts] = useState<Record<string, string>>({});
+  const [budgetStart, setBudgetStart] = useState(() => {
+    const now = new Date();
+    return dateKey(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [budgetEnd, setBudgetEnd] = useState(() => {
+    const now = new Date();
+    return dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  });
+  const [budgetCadence, setBudgetCadence] = useState('monthly');
 
   const goalOptions = [
     { id: 'debt', label: 'Pay off debt', Icon: CreditCard },
@@ -107,6 +120,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
     ...(withPartner ? ['Partner'] : []),
     'Categories',
     'Amounts',
+    'Budget period',
     'Connect accounts',
   ];
   const steps = labels.map((label, index) => ({ id: index + 1, label }));
@@ -120,6 +134,8 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
       return false;
     }
     if (step === 'About you' && withPartner === null) return false;
+    if (step === 'Budget period' && (!budgetStart || !budgetEnd || budgetEnd <= budgetStart))
+      return false;
     return true;
   };
 
@@ -133,6 +149,8 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
       // Save onboarding data before completing
       const completedData: OnboardingData = {
         ...onboardingData,
+        budgetStartDate: budgetStart,
+        budgetEndDate: budgetEnd,
         defaultAmounts: Object.fromEntries(
           onboardingData.categories.map((categoryId) => {
             const amount = Number(defaultAmountDrafts[categoryId]);
@@ -228,6 +246,11 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                     These defaults will be used for your first and future budget periods.
                   </p>
                 </div>
+              )}
+              {step === 'Budget period' && (
+                <h1 className="text-3xl font-semibold tracking-tight">
+                  Set your first budget period
+                </h1>
               )}
             </CardHeader>
             <CardContent className="flex flex-col min-h-[420px]">
@@ -371,6 +394,20 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                 {step === 'Connect accounts' && (
                   <div className="w-full">
                     <BankConnectionsPanel centerControls />
+                  </div>
+                )}
+                {step === 'Budget period' && (
+                  <div className="w-full max-w-md">
+                    <BudgetDateFields
+                      prefix="onboarding"
+                      start={budgetStart}
+                      end={budgetEnd}
+                      onStart={setBudgetStart}
+                      onEnd={setBudgetEnd}
+                      cadence={budgetCadence}
+                      onCadenceChange={setBudgetCadence}
+                      showHint={false}
+                    />
                   </div>
                 )}
                 {step === 'Categories' && (

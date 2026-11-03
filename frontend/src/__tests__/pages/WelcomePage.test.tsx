@@ -8,6 +8,13 @@ import { ThemeProvider } from '../../components/theme/ThemeProvider';
 vi.mock('../../components/BankConnectionsPanel', () => ({
   default: () => <div>Bank connection controls</div>,
 }));
+vi.mock('@/wailsAdapter', () => ({
+  PreviewBudgetWindow: vi.fn(async (start: string) => {
+    const [year, month] = start.split('-').map(Number);
+    const last = new Date(year, month, 0).getDate();
+    return { end: `${year}-${String(month).padStart(2, '0')}-${last}` };
+  }),
+}));
 
 describe('WelcomePage', () => {
   beforeAll(() => {
@@ -53,7 +60,7 @@ describe('WelcomePage', () => {
     expect(cta).toBeInTheDocument();
 
     const stepIndicators = screen.getAllByLabelText(/wizard step/i);
-    expect(stepIndicators).toHaveLength(7);
+    expect(stepIndicators).toHaveLength(8);
     expect(stepIndicators[0]).toHaveAttribute('data-active', 'true');
 
     await user.click(cta);
@@ -148,6 +155,20 @@ describe('WelcomePage', () => {
     await user.click(screen.getByRole('button', { name: /continue/i }));
     await user.type(screen.getByRole('spinbutton', { name: /groceries/i }), '275.50');
     await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(
+      await screen.findByRole('heading', { name: 'Set your first budget period' })
+    ).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Budget period length'), 'custom');
+    await user.clear(screen.getByLabelText('Start Date'));
+    await user.type(screen.getByLabelText('Start Date'), '2026-10-23');
+    await user.clear(screen.getByLabelText('End Date'));
+    await user.type(screen.getByLabelText('End Date'), '2026-11-05');
+    await user.click(screen.getByRole('button', { name: /back/i }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(screen.getByLabelText('Budget period length')).toHaveValue('custom');
+    expect(screen.getByLabelText('Start Date')).toHaveValue('2026-10-23');
+    expect(screen.getByLabelText('End Date')).toHaveValue('2026-11-05');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(screen.getByText(/bank connection controls/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /finish setup/i }));
     expect(onGetStarted).toHaveBeenCalledOnce();
@@ -156,6 +177,8 @@ describe('WelcomePage', () => {
       goals: ['debt'],
       categories: ['groceries', 'utilities'],
       defaultAmounts: { groceries: 275.5, utilities: 0 },
+      budgetStartDate: '2026-10-23',
+      budgetEndDate: '2026-11-05',
     });
   });
 
