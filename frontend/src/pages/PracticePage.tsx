@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import BudgetPage from './BudgetPage';
 import TransactionsPage from './TransactionsPage';
+import ReportsPage from './ReportsPage';
 import type { TransactionFilter } from '@/lib/transactionBrowser';
 import type { PracticeSession } from '@/lib/practice';
 
@@ -14,7 +15,7 @@ export default function PracticePage({
   onReset: () => void;
   onExit: () => void;
 }) {
-  const [view, setView] = useState<'budgets' | 'transactions'>('budgets');
+  const [view, setView] = useState<'budgets' | 'transactions' | 'reports'>('budgets');
   const [filter, setFilter] = useState<TransactionFilter>();
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -68,6 +69,14 @@ export default function PracticePage({
           >
             Practice transactions
           </Button>
+          <Button
+            size="sm"
+            variant={view === 'reports' ? 'default' : 'outline'}
+            aria-pressed={view === 'reports'}
+            onClick={() => setView('reports')}
+          >
+            Practice reports
+          </Button>
         </nav>
       </section>
       {view === 'budgets' ? (
@@ -77,8 +86,10 @@ export default function PracticePage({
             setView('transactions');
           }}
         />
-      ) : (
+      ) : view === 'transactions' ? (
         <TransactionsPage key={JSON.stringify(filter) || 'all'} initialFilter={filter} />
+      ) : (
+        <ReportsPage />
       )}
     </div>
   );

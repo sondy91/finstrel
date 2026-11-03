@@ -1,169 +1,133 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatMoney } from '@/lib/utils';
-import { GetCategories, GetTransactions } from '@/wailsAdapter';
-import { useEffect, useMemo, useState } from 'react';
+import { buildReportData } from '@/lib/reportData';
+import { GetBankFeedView, GetCategories, GetTransactions } from '@/wailsAdapter';
+import { useEffect, useState } from 'react';
 import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Pie,
-    PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { models } from '../../wailsjs/go/models';
+
+const colors = ['#d9a84e', '#54b0a5', '#8d9ed6', '#e18667', '#a484c7', '#8eac65'];
+type ReportData = ReturnType<typeof buildReportData>;
 
 export default function ReportsPage() {
-    const [transactions, setTransactions] = useState<models.Transaction[]>([]);
-    const [categories, setCategories] = useState<models.Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                const [txs, cats] = await Promise.all([
-                    GetTransactions(),
-                    GetCategories(),
-                ]);
-                setTransactions(txs || []);
-                setCategories(cats || []);
-            } catch (error) {
-                console.error('Failed to load report data:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadData();
-    }, []);
-
-    // 1. Income vs Expenses by Month
-    const monthlyData = useMemo(() => {
-        const data: Record<string, { name: string; income: number; expense: number }> = {};
-
-        transactions.forEach((t) => {
-            const date = new Date(t.date);
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const monthName = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-
-            if (!data[key]) {
-                data[key] = { name: monthName, income: 0, expense: 0 };
-            }
-
-            if (t.type === 'Income') {
-                data[key].income += Math.abs(t.amount);
-            } else {
-                data[key].expense += Math.abs(t.amount);
-            }
-        });
-
-        return Object.values(data).sort((a, b) => a.name.localeCompare(b.name)); // Basic sort, might need better date sorting
-    }, [transactions]);
-
-    // 2. Spending by Category
-    const categoryData = useMemo(() => {
-        const data: Record<number, number> = {};
-
-        transactions
-            .filter((t) => t.type === 'Expense')
-            .forEach((t) => {
-                data[t.categoryId] = (data[t.categoryId] || 0) + Math.abs(t.amount);
-            });
-
-        return Object.entries(data)
-            .map(([catId, amount]) => {
-                const category = categories.find((c) => c.id === parseInt(catId));
-                return {
-                    name: category ? category.name : `ID: ${catId}`,
-                    value: amount,
-                };
-            })
-            .sort((a, b) => b.value - a.value); // Sort by highest spending
-    }, [transactions, categories]);
-
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <p className="text-muted-foreground">Loading reports...</p>
-            </div>
-        );
-    }
-
+  const [data, setData] = useState<ReportData | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    Promise.all([GetTransactions(), GetCategories(), GetBankFeedView()])
+      .then(([transactions, categories, feeds]) => {
+        if (active) setData(buildReportData(transactions || [], categories || [], feeds));
+      })
+      .catch(() => {
+        if (active) setError('Could not load report data.');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  if (error)
     return (
-        <div className="page-container max-w-7xl mx-auto py-8 px-6">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-                <p className="text-muted-foreground mt-2">
-                    Visual insights into your financial health.
-                </p>
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-2">
-                {/* Income vs Expenses Chart */}
-                <Card className="col-span-2 lg:col-span-1">
-                    <CardHeader>
-                        <CardTitle>Income vs Expenses</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={monthlyData}
-                                    margin={{
-                                        top: 5,
-                                        right: 30,
-                                        left: 20,
-                                        bottom: 5,
-                                    }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="income" name="Income" fill="#22c55e" />
-                                    <Bar dataKey="expense" name="Expenses" fill="#ef4444" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Spending by Category Chart */}
-                <Card className="col-span-2 lg:col-span-1">
-                    <CardHeader>
-                        <CardTitle>Spending by Category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={categoryData}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ name, percent }) => `${name} ${(percent ? percent * 100 : 0).toFixed(0)}%`}
-                                        outerRadius={80}
-                                        fill="#8884d8"
-                                        dataKey="value"
-                                    >
-                                        {categoryData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip formatter={(value: number) => `$${formatMoney(value)}`} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
+      <div className="page-container mx-auto max-w-7xl px-6 py-8" role="alert">
+        {error}
+      </div>
     );
+  if (!data)
+    return (
+      <div
+        className="flex min-h-[400px] items-center justify-center text-muted-foreground"
+        role="status"
+      >
+        Loading reports…
+      </div>
+    );
+  return (
+    <div className="page-container mx-auto max-w-7xl px-6 py-8">
+      <h1 className="mb-8 text-3xl font-bold tracking-tight">Reports</h1>
+      {data.excluded > 0 && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          {data.excluded} uncategorized or non-USD bank transactions are excluded.
+        </p>
+      )}
+      {data.possibleOverlap && (
+        <p className="mb-4 text-sm text-muted-foreground">
+          Bank and other transactions may overlap. Review possible duplicates in Transactions.
+        </p>
+      )}
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Income vs Expenses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.monthlyData.length ? (
+              <div className="h-[300px] w-full min-w-0" aria-label="Income and expenses chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data.monthlyData}
+                    margin={{ top: 5, right: 15, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value: number) => `$${formatMoney(value)}`} />
+                    <Legend />
+                    <Bar dataKey="income" name="Income" fill="#22c55e" />
+                    <Bar dataKey="expense" name="Expenses" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+                No transactions yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle>Spending by Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.categoryData.length ? (
+              <div className="h-[300px] w-full min-w-0" aria-label="Spending by category chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={data.categoryData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                    >
+                      {data.categoryData.map((entry, index) => (
+                        <Cell key={entry.name} fill={colors[index % colors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => `$${formatMoney(value)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+                No categorized spending yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 }
