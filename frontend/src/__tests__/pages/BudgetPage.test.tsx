@@ -46,9 +46,22 @@ describe('BudgetPage', () => {
     // Set up default mock implementations on mocked adapter API
     (Adapter.GetBudgetPeriods as unknown as Mock).mockResolvedValue(mockBudgetPeriods as any);
     (Adapter.GetCategories as unknown as Mock).mockResolvedValue(mockCategories as any);
-    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValue(mockAllocations as any);
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValue(
+      mockAllocations as any
+    );
 
-    (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({manualCount:0,manualPending:0,manualExpenses:0,plannedExpenses:500,importedCount:0,importedPending:0,importedExpensesUSD:0,environment:'sandbox',bankNotice:'History may be incomplete.',imported:[]});
+    (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({
+      manualCount: 0,
+      manualPending: 0,
+      manualExpenses: 0,
+      plannedExpenses: 500,
+      importedCount: 0,
+      importedPending: 0,
+      importedExpensesUSD: 0,
+      environment: 'sandbox',
+      bankNotice: 'History may be incomplete.',
+      imported: [],
+    });
     // No need to stub window.go when mocking the adapter directly
   });
 
@@ -82,9 +95,45 @@ describe('BudgetPage', () => {
     // Check if allocations are displayed
     await waitFor(() => {
       expect(screen.getByText('Groceries')).toBeInTheDocument();
-      expect(screen.getByText('$500.00')).toBeInTheDocument();
+      expect(screen.getAllByText('$500.00').length).toBeGreaterThan(0);
       expect(Adapter.GetBudgetAllocationsByBudgetPeriodID).toHaveBeenCalledWith(1);
     });
+  });
+
+  it('shows categorized spending and income against each envelope', async () => {
+    (Adapter.GetCategories as unknown as Mock).mockResolvedValue([
+      ...mockCategories,
+      { id: 3, name: 'Pay', type: 'Income' },
+    ]);
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValue([
+      ...mockAllocations,
+      { id: 2, budgetPeriodId: 1, categoryId: 3, allocatedAmount: 1000 },
+    ]);
+    (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({
+      spentByCategory: { 1: 125 },
+      incomeByCategory: { 3: 700 },
+    });
+    render(<BudgetPage />);
+    await userEvent.click(await screen.findByText('August 2025'));
+    const groceries = (await screen.findByText('Groceries')).closest('tr')!;
+    expect(within(groceries).getByText('$125.00')).toBeInTheDocument();
+    expect(within(groceries).getByText('$375.00')).toBeInTheDocument();
+    const pay = screen.getByText('Pay').closest('tr')!;
+    expect(within(pay).getByText('$700.00')).toBeInTheDocument();
+    expect(within(pay).getByText('$300.00')).toBeInTheDocument();
+  });
+
+  it('does not show incomplete totals when bank history cannot be opened', async () => {
+    (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({
+      bankNotice: 'Imported bank history could not be opened.',
+    });
+    render(<BudgetPage />);
+    await userEvent.click(await screen.findByText('August 2025'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Imported bank history could not be opened.'
+    );
+    const groceries = (await screen.findByText('Groceries')).closest('tr')!;
+    expect(within(groceries).getAllByText('—')).toHaveLength(2);
   });
 
   it('shows empty states when there are no budget periods', async () => {
@@ -95,7 +144,9 @@ describe('BudgetPage', () => {
   });
 
   it('shows empty envelopes message and allows toggling Add form', async () => {
-    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValueOnce([] as any);
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValueOnce(
+      [] as any
+    );
     render(<BudgetPage />);
 
     const periodButton = await screen.findByText('August 2025');
@@ -141,7 +192,9 @@ describe('BudgetPage', () => {
   });
 
   it('shows error when allocations fetch fails', async () => {
-    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockRejectedValueOnce(new Error('boom'));
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockRejectedValueOnce(
+      new Error('boom')
+    );
     render(<BudgetPage />);
 
     const periodButton = await screen.findByText('August 2025');
@@ -153,7 +206,9 @@ describe('BudgetPage', () => {
 
   it('shows categories error inside Add form when categories fetch fails', async () => {
     (Adapter.GetCategories as unknown as Mock).mockRejectedValueOnce(new Error('no cats'));
-    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValueOnce([] as any);
+    (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValueOnce(
+      [] as any
+    );
     render(<BudgetPage />);
 
     const periodButton = await screen.findByText('August 2025');

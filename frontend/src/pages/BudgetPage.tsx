@@ -1,4 +1,5 @@
 import { type TransactionFilter } from '@/lib/transactionBrowser';
+import { onBankFeedsUpdated } from '@/lib/bankUpdates';
 import BudgetDateFields from '@/components/BudgetDateFields';
 import BudgetCloseoutPanel from '@/components/BudgetCloseoutPanel';
 import {
@@ -10,7 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,7 +31,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import { formatMoney } from '@/lib/utils';
 import { Edit2, Plus, Save, Trash2, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -45,14 +46,18 @@ import {
   GetBudgetPeriods,
   AddBudgetPeriod,
   GetCategories,
+  GetBudgetReview,
   UpdateBudgetAllocation,
   UpdateBudgetPeriod,
-	PopulateBudgetPeriodFromDefaults,
-	CloseAndCreateBudgetPeriod,
+  PopulateBudgetPeriodFromDefaults,
+  CloseAndCreateBudgetPeriod,
   UpdateBudgetPeriodStatus,
 } from '../wailsAdapter';
 
-const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>void}> = ({onBrowseTransactions}) => {
+const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) => void }> = ({
+  onBrowseTransactions,
+}) => {
+  const money = (value: number) => `${value < 0 ? '-' : ''}$${formatMoney(Math.abs(value))}`;
   const [budgetPeriods, setBudgetPeriods] = useState<models.BudgetPeriod[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +67,12 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
   const [allocations, setAllocations] = useState<models.BudgetAllocation[]>([]);
   const [isLoadingAllocations, setIsLoadingAllocations] = useState<boolean>(false);
   const [allocationsError, setAllocationsError] = useState<string | null>(null);
+  const [activity, setActivity] = useState<{
+    spentByCategory: Record<number, number>;
+    incomeByCategory: Record<number, number>;
+  } | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [activityWarnings, setActivityWarnings] = useState<string[]>([]);
 
   const [categories, setCategories] = useState<models.Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
@@ -69,26 +80,26 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
 
   const [showAddAllocationForm, setShowAddAllocationForm] = useState<boolean>(false);
   const [isCreatePeriodOpen, setIsCreatePeriodOpen] = useState<boolean>(false);
-	const [isHandoffOpen, setIsHandoffOpen] = useState<boolean>(false);
-	const [nextPeriodName, setNextPeriodName] = useState('');
-	const [nextPeriodStart, setNextPeriodStart] = useState('');
-	const [nextPeriodEnd, setNextPeriodEnd] = useState('');
-	const [handoffError, setHandoffError] = useState<string | null>(null);
-	const [isHandingOff, setIsHandingOff] = useState(false);
-	const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState<boolean>(false);
+  const [isHandoffOpen, setIsHandoffOpen] = useState<boolean>(false);
+  const [nextPeriodName, setNextPeriodName] = useState('');
+  const [nextPeriodStart, setNextPeriodStart] = useState('');
+  const [nextPeriodEnd, setNextPeriodEnd] = useState('');
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [isHandingOff, setIsHandingOff] = useState(false);
+  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState<boolean>(false);
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [allocationToDelete, setAllocationToDelete] = useState<number | null>(null);
 
   // Inline editing state
   const [editingAllocationId, setEditingAllocationId] = useState<number | null>(null);
-  const [editingAmount, setEditingAmount] = useState<string>("");
+  const [editingAmount, setEditingAmount] = useState<string>('');
 
   // Period editing state
   const [isEditPeriodOpen, setIsEditPeriodOpen] = useState<boolean>(false);
-  const [editPeriodName, setEditPeriodName] = useState<string>("");
-  const [editPeriodStart, setEditPeriodStart] = useState<string>("");
-  const [editPeriodEnd, setEditPeriodEnd] = useState<string>("");
+  const [editPeriodName, setEditPeriodName] = useState<string>('');
+  const [editPeriodStart, setEditPeriodStart] = useState<string>('');
+  const [editPeriodEnd, setEditPeriodEnd] = useState<string>('');
 
   const fetchBudgetPeriods = async () => {
     setIsLoading(true);
@@ -133,29 +144,55 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
     setIsCreatePeriodOpen(false);
   };
 
-	const openHandoff = () => {
-		if (!selectedPeriod) return;
-		const currentEnd = new Date(String(selectedPeriod.endDate).slice(0,10)+'T12:00:00');
-		const start = new Date(currentEnd); start.setDate(start.getDate() + 1);
-		const durationDays = Math.max(1, Math.round((currentEnd.getTime() - new Date(String(selectedPeriod.startDate).slice(0,10)+'T12:00:00').getTime()) / 86400000));
-		const end = new Date(start); end.setDate(end.getDate() + durationDays);
-		// Budget dates are shown as local calendar days. Do not serialize through
-		// UTC here or evening offsets can advance the suggested period by one day.
-		const toInputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		setNextPeriodName(''); setNextPeriodStart(toInputDate(start)); setNextPeriodEnd(toInputDate(end)); setHandoffError(null); setIsHandoffOpen(true);
-	};
+  const openHandoff = () => {
+    if (!selectedPeriod) return;
+    const currentEnd = new Date(String(selectedPeriod.endDate).slice(0, 10) + 'T12:00:00');
+    const start = new Date(currentEnd);
+    start.setDate(start.getDate() + 1);
+    const durationDays = Math.max(
+      1,
+      Math.round(
+        (currentEnd.getTime() -
+          new Date(String(selectedPeriod.startDate).slice(0, 10) + 'T12:00:00').getTime()) /
+          86400000
+      )
+    );
+    const end = new Date(start);
+    end.setDate(end.getDate() + durationDays);
+    // Budget dates are shown as local calendar days. Do not serialize through
+    // UTC here or evening offsets can advance the suggested period by one day.
+    const toInputDate = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    setNextPeriodName('');
+    setNextPeriodStart(toInputDate(start));
+    setNextPeriodEnd(toInputDate(end));
+    setHandoffError(null);
+    setIsHandoffOpen(true);
+  };
 
-	const completeHandoff = async () => {
-		if (!selectedPeriod) return;
-		setHandoffError(null); setIsHandingOff(true);
-		try {
-			const next = selectedPeriod.status === 'Closed'
-              ? await AddBudgetPeriod(nextPeriodName, nextPeriodStart, nextPeriodEnd, 'Open')
-              : await CloseAndCreateBudgetPeriod(selectedPeriod.id, nextPeriodName, nextPeriodStart, nextPeriodEnd);
-			await fetchBudgetPeriods(); setSelectedPeriod(next); setIsHandoffOpen(false);
-		} catch (err: any) { setHandoffError(err.message || 'Unable to start the next period'); }
-		finally { setIsHandingOff(false); }
-	};
+  const completeHandoff = async () => {
+    if (!selectedPeriod) return;
+    setHandoffError(null);
+    setIsHandingOff(true);
+    try {
+      const next =
+        selectedPeriod.status === 'Closed'
+          ? await AddBudgetPeriod(nextPeriodName, nextPeriodStart, nextPeriodEnd, 'Open')
+          : await CloseAndCreateBudgetPeriod(
+              selectedPeriod.id,
+              nextPeriodName,
+              nextPeriodStart,
+              nextPeriodEnd
+            );
+      await fetchBudgetPeriods();
+      setSelectedPeriod(next);
+      setIsHandoffOpen(false);
+    } catch (err: any) {
+      setHandoffError(err.message || 'Unable to start the next period');
+    } finally {
+      setIsHandingOff(false);
+    }
+  };
 
   const handlePeriodSelect = (period: models.BudgetPeriod) => {
     setSelectedPeriod(period);
@@ -170,7 +207,7 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
     try {
       const fetchedAllocations = await GetBudgetAllocationsByBudgetPeriodID(selectedPeriod.id);
       setAllocations(fetchedAllocations || []);
-      setCloseoutRevision(v=>v+1);
+      setCloseoutRevision((v) => v + 1);
     } catch (err: any) {
       console.error(`Error fetching allocations for period ${selectedPeriod.id}:`, err);
       setAllocationsError(err.message || 'Failed to fetch allocations');
@@ -187,6 +224,49 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
     }
   }, [selectedPeriod]);
 
+  useEffect(() => {
+    if (!selectedPeriod) {
+      setActivity(null);
+      return;
+    }
+    let active = true;
+    let version = 0;
+    const load = async () => {
+      const request = ++version;
+      setActivity(null);
+      setActivityError(null);
+      setActivityWarnings([]);
+      try {
+        const review = await GetBudgetReview(selectedPeriod.id);
+        if (!active || request !== version) return;
+        if (review.bankNotice?.includes('could not be opened')) throw new Error(review.bankNotice);
+        setActivity({
+          spentByCategory: review.spentByCategory || {},
+          incomeByCategory: review.incomeByCategory || {},
+        });
+        const warnings: string[] = [];
+        if (review.uncategorizedCount)
+          warnings.push(`${review.uncategorizedCount} bank transactions need a category`);
+        if (review.unsupportedCurrencyCount)
+          warnings.push(`${review.unsupportedCurrencyCount} non-USD transactions excluded`);
+        if (review.manualCount && review.importedCount)
+          warnings.push('Manual and bank transactions may overlap');
+        if (review.possibleBankOverlap)
+          warnings.push('Connected and disconnected bank transactions may overlap');
+        setActivityWarnings(warnings);
+      } catch (err: any) {
+        if (active && request === version)
+          setActivityError(err.message || 'Unable to load transaction totals');
+      }
+    };
+    void load();
+    const unsubscribe = onBankFeedsUpdated(() => void load());
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [selectedPeriod?.id, selectedPeriod?.startDate, selectedPeriod?.endDate, closeoutRevision]);
+
   const handleAllocationModified = () => {
     setShowAddAllocationForm(false);
     if (selectedPeriod) {
@@ -194,24 +274,33 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
     }
   };
 
-	const handleCategoryCreatedFromBudget = () => {
-		fetchCategories();
-		setIsCreateCategoryOpen(false);
-	};
+  const handleCategoryCreatedFromBudget = () => {
+    fetchCategories();
+    setIsCreateCategoryOpen(false);
+  };
 
-	const populateFromDefaults = async () => {
-		if (!selectedPeriod) return;
-		try { await PopulateBudgetPeriodFromDefaults(selectedPeriod.id); fetchAllocationsForSelectedPeriod(); }
-		catch (err: any) { setAllocationsError(err.message || 'Failed to populate defaults'); }
-	};
+  const populateFromDefaults = async () => {
+    if (!selectedPeriod) return;
+    try {
+      await PopulateBudgetPeriodFromDefaults(selectedPeriod.id);
+      fetchAllocationsForSelectedPeriod();
+    } catch (err: any) {
+      setAllocationsError(err.message || 'Failed to populate defaults');
+    }
+  };
 
   const getCategoryName = (categoryId: number): string => {
-    const category = categories.find(cat => cat.id === categoryId);
+    const category = categories.find((cat) => cat.id === categoryId);
     return category ? category.name : 'Unknown Category';
   };
 
-	const allocationType = (allocation: models.BudgetAllocation) => categories.find(category => category.id === allocation.categoryId)?.type || 'Expense';
-	const displayAllocations = [...allocations].sort((a, b) => allocationType(a).localeCompare(allocationType(b)) || getCategoryName(a.categoryId).localeCompare(getCategoryName(b.categoryId)));
+  const allocationType = (allocation: models.BudgetAllocation) =>
+    categories.find((category) => category.id === allocation.categoryId)?.type || 'Expense';
+  const displayAllocations = [...allocations].sort(
+    (a, b) =>
+      allocationType(a).localeCompare(allocationType(b)) ||
+      getCategoryName(a.categoryId).localeCompare(getCategoryName(b.categoryId))
+  );
 
   const requestDeleteAllocation = (id: number) => {
     setAllocationToDelete(id);
@@ -240,7 +329,7 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
 
   const cancelEditingAllocation = () => {
     setEditingAllocationId(null);
-    setEditingAmount("");
+    setEditingAmount('');
   };
 
   const saveAllocation = async (id: number) => {
@@ -254,8 +343,8 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
       setEditingAllocationId(null);
       fetchAllocationsForSelectedPeriod();
     } catch (err: any) {
-      console.error("Failed to update allocation", err);
-      setAllocationsError(err.message || "Failed to update allocation");
+      console.error('Failed to update allocation', err);
+      setAllocationsError(err.message || 'Failed to update allocation');
     }
   };
 
@@ -284,9 +373,9 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
       setIsEditPeriodOpen(false);
       fetchBudgetPeriods(); // Refresh list and selected period
     } catch (err: any) {
-      console.error("Failed to update period", err);
+      console.error('Failed to update period', err);
       // Show error in dialog if possible, or alert
-      alert("Failed to update period: " + err.message);
+      alert('Failed to update period: ' + err.message);
     }
   };
 
@@ -315,13 +404,22 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
         </Dialog>
       </div>
 
-      <BudgetCloseoutPanel onBrowseTransactions={onBrowseTransactions} revision={closeoutRevision} periods={budgetPeriods} selected={selectedPeriod} onSelect={handlePeriodSelect} onClosed={()=>void fetchBudgetPeriods()} />
+      <BudgetCloseoutPanel
+        onBrowseTransactions={onBrowseTransactions}
+        revision={closeoutRevision}
+        periods={budgetPeriods}
+        selected={selectedPeriod}
+        onSelect={handlePeriodSelect}
+        onClosed={() => void fetchBudgetPeriods()}
+      />
 
       {/* Carousel of Budget Periods */}
       <div className="mb-8">
         {isLoading && <p className="text-muted-foreground">Loading budget periods...</p>}
         {!isLoading && budgetPeriods.length === 0 && (
-          <p className="text-muted-foreground">No budget periods found. Create one to get started!</p>
+          <p className="text-muted-foreground">
+            No budget periods found. Create one to get started!
+          </p>
         )}
         {!isLoading && budgetPeriods.length > 0 && (
           <div className="flex gap-4 overflow-x-auto pb-4 snap-x">
@@ -349,10 +447,43 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
                   <Edit2 className="h-4 w-4" />
                 </Button>
               </div>
-			  {!showAddAllocationForm && <div className="flex gap-2">{selectedPeriod.status === 'Closed' && <Button variant="outline" onClick={async()=>{try{await UpdateBudgetPeriodStatus(selectedPeriod.id,'Open');await fetchBudgetPeriods();}catch(e:any){setAllocationsError(e.message||'Unable to reopen budget');}}} size="sm">Reopen for review</Button>}{['Open','Closed'].includes(selectedPeriod.status) && <Button variant="outline" onClick={openHandoff} size="sm">Start next period</Button>}<Button variant="outline" onClick={populateFromDefaults} size="sm">Populate defaults</Button><Button onClick={() => setShowAddAllocationForm(true)} size="sm"><Plus className="h-4 w-4 mr-2" />Add Envelope</Button></div>}
+              {!showAddAllocationForm && (
+                <div className="flex gap-2">
+                  {selectedPeriod.status === 'Closed' && (
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await UpdateBudgetPeriodStatus(selectedPeriod.id, 'Open');
+                          await fetchBudgetPeriods();
+                        } catch (e: any) {
+                          setAllocationsError(e.message || 'Unable to reopen budget');
+                        }
+                      }}
+                      size="sm"
+                    >
+                      Reopen for review
+                    </Button>
+                  )}
+                  {['Open', 'Closed'].includes(selectedPeriod.status) && (
+                    <Button variant="outline" onClick={openHandoff} size="sm">
+                      Start next period
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={populateFromDefaults} size="sm">
+                    Populate defaults
+                  </Button>
+                  <Button onClick={() => setShowAddAllocationForm(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Envelope
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
-              {isLoadingAllocations && <p className="text-muted-foreground">Loading envelopes...</p>}
+              {isLoadingAllocations && (
+                <p className="text-muted-foreground">Loading envelopes...</p>
+              )}
               {allocationsError && <p className="text-destructive">Error: {allocationsError}</p>}
 
               {showAddAllocationForm ? (
@@ -367,7 +498,7 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
                       existingAllocations={allocations}
                       onAllocationModified={handleAllocationModified}
                       allocationToEdit={null}
-					  onCreateCategory={() => setIsCreateCategoryOpen(true)}
+                      onCreateCategory={() => setIsCreateCategoryOpen(true)}
                     />
                   )}
                   <Button
@@ -382,72 +513,127 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
                 <>
                   {!isLoadingAllocations && !allocationsError && allocations.length === 0 && (
                     <div className="text-center py-12">
-                      <p className="text-muted-foreground mb-4">No envelopes found for this period.</p>
+                      <p className="text-muted-foreground mb-4">
+                        No envelopes found for this period.
+                      </p>
                       <Button onClick={() => setShowAddAllocationForm(true)} variant="outline">
                         Create your first envelope
                       </Button>
                     </div>
                   )}
-				  {!isLoadingAllocations && !allocationsError && allocations.length > 0 && (
+                  {!isLoadingAllocations && !allocationsError && allocations.length > 0 && (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Category</TableHead>
                           <TableHead>Budgeted Amount</TableHead>
+                          <TableHead>Activity</TableHead>
+                          <TableHead>Remaining</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-						{displayAllocations.map((alloc, index) => (
-						  <React.Fragment key={alloc.id}>
-							{index === 0 || allocationType(displayAllocations[index - 1]) !== allocationType(alloc) ? <TableRow className="bg-muted/40 hover:bg-muted/40"><TableCell colSpan={3} className="font-semibold">{allocationType(alloc) === 'Income' ? 'Planned Income' : 'Expense Envelopes'}</TableCell></TableRow> : null}
-						  <TableRow>
-                            <TableCell className="font-medium">{getCategoryName(alloc.categoryId)}</TableCell>
-                            <TableCell>
-                              {editingAllocationId === alloc.id ? (
-                                <div className="flex items-center gap-2">
-                                  <Input
-                                    type="number"
-                                    value={editingAmount}
-                                    onChange={(e) => setEditingAmount(e.target.value)}
-                                    onKeyDown={(e) => handleKeyDown(e, alloc.id)}
-                                    className="w-32 h-8"
-                                    autoFocus
-                                  />
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => saveAllocation(alloc.id)}>
-                                    <Save className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={cancelEditingAllocation}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded group"
-                                  onClick={() => startEditingAllocation(alloc)}
+                        {displayAllocations.map((alloc, index) => (
+                          <React.Fragment key={alloc.id}>
+                            {index === 0 ||
+                            allocationType(displayAllocations[index - 1]) !==
+                              allocationType(alloc) ? (
+                              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                <TableCell colSpan={5} className="font-semibold">
+                                  {allocationType(alloc) === 'Income'
+                                    ? 'Planned Income'
+                                    : 'Expense Envelopes'}
+                                </TableCell>
+                              </TableRow>
+                            ) : null}
+                            <TableRow>
+                              <TableCell className="font-medium">
+                                {getCategoryName(alloc.categoryId)}
+                              </TableCell>
+                              <TableCell>
+                                {editingAllocationId === alloc.id ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      value={editingAmount}
+                                      onChange={(e) => setEditingAmount(e.target.value)}
+                                      onKeyDown={(e) => handleKeyDown(e, alloc.id)}
+                                      className="w-32 h-8"
+                                      autoFocus
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-green-600"
+                                      onClick={() => saveAllocation(alloc.id)}
+                                    >
+                                      <Save className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 text-red-600"
+                                      onClick={cancelEditingAllocation}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-1 rounded group"
+                                    onClick={() => startEditingAllocation(alloc)}
+                                  >
+                                    <span>${formatMoney(alloc.allocatedAmount)}</span>
+                                    <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {activity
+                                  ? money(
+                                      (allocationType(alloc) === 'Income'
+                                        ? activity.incomeByCategory
+                                        : activity.spentByCategory)[alloc.categoryId] || 0
+                                    )
+                                  : '—'}
+                              </TableCell>
+                              <TableCell>
+                                {activity
+                                  ? money(
+                                      alloc.allocatedAmount -
+                                        ((allocationType(alloc) === 'Income'
+                                          ? activity.incomeByCategory
+                                          : activity.spentByCategory)[alloc.categoryId] || 0)
+                                    )
+                                  : '—'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  aria-label={`Delete ${getCategoryName(alloc.categoryId)} envelope`}
+                                  onClick={() => requestDeleteAllocation(alloc.id)}
                                 >
-                                  <span>${formatMoney(alloc.allocatedAmount)}</span>
-                                  <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                aria-label={`Delete ${getCategoryName(alloc.categoryId)} envelope`}
-                                onClick={() => requestDeleteAllocation(alloc.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-						  </TableRow>
-						  </React.Fragment>
-						))}
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          </React.Fragment>
+                        ))}
                       </TableBody>
                     </Table>
                   )}
+                  {activityError && (
+                    <p role="alert" className="mt-3 text-sm text-destructive">
+                      {activityError}
+                    </p>
+                  )}
+                  {activityWarnings.map((warning) => (
+                    <p key={warning} className="mt-3 text-sm text-muted-foreground">
+                      {warning}
+                    </p>
+                  ))}
                 </>
               )}
             </CardContent>
@@ -456,28 +642,73 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <h3 className="text-lg font-semibold mb-2">No Period Selected</h3>
-              <p className="text-muted-foreground">Select a budget period from the list above to view its envelopes.</p>
+              <p className="text-muted-foreground">
+                Select a budget period from the list above to view its envelopes.
+              </p>
             </CardContent>
           </Card>
         )}
       </div>
 
       {/* Edit Period Dialog */}
-		<Dialog open={isHandoffOpen} onOpenChange={setIsHandoffOpen}>
-		  <DialogContent>
-			<DialogHeader><DialogTitle>{selectedPeriod?.status === 'Closed' ? 'Start next period' : 'Close and start next period'}</DialogTitle></DialogHeader>
-			<DialogDescription>{selectedPeriod?.status === 'Closed' ? 'Your reviewed budget stays closed. The next period starts from your category defaults.' : `This closes ${selectedPeriod?.name} and creates an editable new period from your category defaults.`}</DialogDescription>
-			{handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
-			<div className="space-y-4"><div className="space-y-2"><Label htmlFor="next-period-name">New period name</Label><Input id="next-period-name" value={nextPeriodName} onChange={e => setNextPeriodName(e.target.value)} placeholder="e.g., October Budget" /></div><BudgetDateFields prefix="next-period" start={nextPeriodStart} end={nextPeriodEnd} onStart={setNextPeriodStart} onEnd={setNextPeriodEnd} /><Button onClick={completeHandoff} disabled={isHandingOff || !nextPeriodName || !nextPeriodStart || !nextPeriodEnd} className="w-full">{isHandingOff ? 'Starting…' : selectedPeriod?.status === 'Closed' ? 'Create next period' : 'Close current and start next period'}</Button></div>
-		  </DialogContent>
-		</Dialog>
+      <Dialog open={isHandoffOpen} onOpenChange={setIsHandoffOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {selectedPeriod?.status === 'Closed'
+                ? 'Start next period'
+                : 'Close and start next period'}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            {selectedPeriod?.status === 'Closed'
+              ? 'Your reviewed budget stays closed. The next period starts from your category defaults.'
+              : `This closes ${selectedPeriod?.name} and creates an editable new period from your category defaults.`}
+          </DialogDescription>
+          {handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="next-period-name">New period name</Label>
+              <Input
+                id="next-period-name"
+                value={nextPeriodName}
+                onChange={(e) => setNextPeriodName(e.target.value)}
+                placeholder="e.g., October Budget"
+              />
+            </div>
+            <BudgetDateFields
+              prefix="next-period"
+              start={nextPeriodStart}
+              end={nextPeriodEnd}
+              onStart={setNextPeriodStart}
+              onEnd={setNextPeriodEnd}
+            />
+            <Button
+              onClick={completeHandoff}
+              disabled={isHandingOff || !nextPeriodName || !nextPeriodStart || !nextPeriodEnd}
+              className="w-full"
+            >
+              {isHandingOff
+                ? 'Starting…'
+                : selectedPeriod?.status === 'Closed'
+                  ? 'Create next period'
+                  : 'Close current and start next period'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
-		  <DialogContent>
-			<DialogHeader><DialogTitle>Create a category</DialogTitle></DialogHeader>
-			<AddCategoryForm categories={categories} onCategoryAdded={handleCategoryCreatedFromBudget} />
-		  </DialogContent>
-		</Dialog>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a category</DialogTitle>
+          </DialogHeader>
+          <AddCategoryForm
+            categories={categories}
+            onCategoryAdded={handleCategoryCreatedFromBudget}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditPeriodOpen} onOpenChange={setIsEditPeriodOpen}>
         <DialogContent>
@@ -517,7 +748,9 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsEditPeriodOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsEditPeriodOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={handleSavePeriod}>Save Changes</Button>
           </div>
         </DialogContent>
@@ -532,8 +765,13 @@ const BudgetPage: React.FC<{onBrowseTransactions?:(filter:TransactionFilter)=>vo
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAllocationToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteAllocation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel onClick={() => setAllocationToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteAllocation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

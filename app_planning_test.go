@@ -25,6 +25,8 @@ func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
 	app := NewApp()
 	category, err := app.AddCategoryWithDefault("Food", "Expense", nil, 100)
 	require.NoError(t, err)
+	income, err := app.AddCategoryWithDefault("Pay", "Income", nil, 1000)
+	require.NoError(t, err)
 	period, err := app.AddBudgetPeriod("January", "2020-01-01", "2020-01-31", "Open")
 	require.NoError(t, err)
 	review, err := reviewBudget(period.ID, func() (bankfeed.View, error) {
@@ -34,11 +36,13 @@ func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
 			{Date: "2020-01-22", Currency: "USD", Amount: -20},
 			{Date: "2020-01-23", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID, ExcludeFromBudget: true},
 			{Date: "2020-01-24", Currency: "USD", Amount: -25, ExcludeFromBudget: true},
+			{Date: "2020-01-25", Currency: "USD", Amount: 500, BudgetCategoryID: income.ID},
 			{Date: "2020-02-01", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID},
 		}}}, ArchivedItems: []bankfeed.Item{{Transactions: []bankfeed.Transaction{{Date: "2020-01-20", Currency: "USD", Amount: -10, BudgetCategoryID: category.ID}}}}}, nil
 	})
 	require.NoError(t, err)
 	require.Equal(t, 40.0, review.SpentByCategory[category.ID])
+	require.Equal(t, 500.0, review.IncomeByCategory[income.ID])
 	require.Equal(t, 1, review.UncategorizedCount)
 }
 func TestScheduledWritesRejectInvalidAmountsAndIncomeCategories(t *testing.T) {

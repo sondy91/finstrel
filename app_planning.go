@@ -105,7 +105,7 @@ func (a *App) GetBudgetReview(periodID int64) (models.BudgetReview, error) {
 }
 
 func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (models.BudgetReview, error) {
-	result := models.BudgetReview{Imported: []models.ReviewTransaction{}, SpentByCategory: map[int64]float64{}}
+	result := models.BudgetReview{Imported: []models.ReviewTransaction{}, SpentByCategory: map[int64]float64{}, IncomeByCategory: map[int64]float64{}}
 	periods, err := database.GetBudgetPeriods()
 	if err != nil {
 		return result, err
@@ -137,6 +137,9 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 		if tx.Type == "Expense" {
 			result.ManualExpenses += math.Abs(tx.Amount)
 			result.SpentByCategory[tx.CategoryID] += math.Abs(tx.Amount)
+		}
+		if tx.Type == "Income" {
+			result.IncomeByCategory[tx.CategoryID] += math.Abs(tx.Amount)
 		}
 	}
 	allocations, err := database.GetBudgetAllocationsByBudgetPeriodID(periodID)
@@ -177,6 +180,9 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 					found = true
 					if category.Type == "Expense" && tx.Currency == "USD" && !tx.ExcludeFromBudget {
 						result.SpentByCategory[category.ID] -= tx.Amount
+					}
+					if category.Type == "Income" && tx.Currency == "USD" && !tx.ExcludeFromBudget {
+						result.IncomeByCategory[category.ID] += tx.Amount
 					}
 					break
 				}

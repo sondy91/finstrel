@@ -25,6 +25,7 @@ type BudgetWindow struct {
 
 type BudgetReview struct {
 	SpentByCategory          map[int64]float64   `json:"spentByCategory"`
+	IncomeByCategory         map[int64]float64   `json:"incomeByCategory"`
 	UncategorizedCount       int                 `json:"uncategorizedCount"`
 	UnsupportedCurrencyCount int                 `json:"unsupportedCurrencyCount"`
 	PossibleBankOverlap      bool                `json:"possibleBankOverlap"`

@@ -261,9 +261,13 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
         .map((t) => ({ ...t, institution: item.institution }))
     );
     const spentByCategory: Record<number, number> = {};
+    const incomeByCategory: Record<number, number> = {};
     for (const t of manual)
       if (t.type === 'Expense')
         spentByCategory[t.categoryId] = (spentByCategory[t.categoryId] || 0) + Math.abs(t.amount);
+    for (const t of manual)
+      if (t.type === 'Income')
+        incomeByCategory[t.categoryId] = (incomeByCategory[t.categoryId] || 0) + Math.abs(t.amount);
     for (const t of imported)
       if (
         !t.excludeFromBudget &&
@@ -272,10 +276,20 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
         categories.some((c) => c.id === t.budgetCategoryId && c.type === 'Expense')
       )
         spentByCategory[t.budgetCategoryId] = (spentByCategory[t.budgetCategoryId] || 0) - t.amount;
+    for (const t of imported)
+      if (
+        !t.excludeFromBudget &&
+        t.budgetCategoryId &&
+        t.currency === 'USD' &&
+        categories.some((c) => c.id === t.budgetCategoryId && c.type === 'Income')
+      )
+        incomeByCategory[t.budgetCategoryId] =
+          (incomeByCategory[t.budgetCategoryId] || 0) + t.amount;
     return {
       manualCount: manual.length,
       manualPending: manual.filter((t) => t.status === 'Pending').length,
       spentByCategory,
+      incomeByCategory,
       uncategorizedCount: imported.filter((t) => !t.budgetCategoryId && !t.excludeFromBudget)
         .length,
       manualExpenses: manual
