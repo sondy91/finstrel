@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/stretchr/testify/require"
-	"testing"
 	"finstrel/internal/bankfeed"
 	"finstrel/internal/models"
 	"finstrel/internal/schedule"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestBudgetPresetsUseInclusiveDateRanges(t *testing.T) {
@@ -17,6 +17,27 @@ func TestBudgetPresetsUseInclusiveDateRanges(t *testing.T) {
 	}
 	_, err := app.PreviewBudgetWindow("2026-10-09", "semimonthly")
 	require.Error(t, err)
+}
+
+func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
+	cleanup := setupTempDBAppForAccount(t)
+	defer cleanup()
+	app := NewApp()
+	category, err := app.AddCategoryWithDefault("Food", "Expense", nil, 100)
+	require.NoError(t, err)
+	period, err := app.AddBudgetPeriod("January", "2020-01-01", "2020-01-31", "Open")
+	require.NoError(t, err)
+	review, err := reviewBudget(period.ID, func() (bankfeed.View, error) {
+		return bankfeed.View{Items: []bankfeed.Item{{Transactions: []bankfeed.Transaction{
+			{Date: "2020-01-20", Currency: "USD", Amount: -35, BudgetCategoryID: category.ID},
+			{Date: "2020-01-21", Currency: "USD", Amount: 5, BudgetCategoryID: category.ID},
+			{Date: "2020-01-22", Currency: "USD", Amount: -20},
+			{Date: "2020-02-01", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID},
+		}}}}, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 30.0, review.SpentByCategory[category.ID])
+	require.Equal(t, 1, review.UncategorizedCount)
 }
 func TestScheduledWritesRejectInvalidAmountsAndIncomeCategories(t *testing.T) {
 	cleanup := setupTempDBAppForAccount(t)

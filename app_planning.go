@@ -1,15 +1,15 @@
 package main
 
 import (
+	"finstrel/internal/bankfeed"
+	"finstrel/internal/database"
+	"finstrel/internal/models"
+	"finstrel/internal/schedule"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 	"time"
-	"finstrel/internal/bankfeed"
-	"finstrel/internal/database"
-	"finstrel/internal/models"
-	"finstrel/internal/schedule"
 )
 
 func (a *App) GetIncomeSchedules() ([]models.IncomeSchedule, error) {
@@ -105,7 +105,7 @@ func (a *App) GetBudgetReview(periodID int64) (models.BudgetReview, error) {
 }
 
 func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (models.BudgetReview, error) {
-	result := models.BudgetReview{Imported: []models.ReviewTransaction{}}
+	result := models.BudgetReview{Imported: []models.ReviewTransaction{}, SpentByCategory: map[int64]float64{}}
 	periods, err := database.GetBudgetPeriods()
 	if err != nil {
 		return result, err
@@ -136,6 +136,7 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 		}
 		if tx.Type == "Expense" {
 			result.ManualExpenses += math.Abs(tx.Amount)
+			result.SpentByCategory[tx.CategoryID] += math.Abs(tx.Amount)
 		}
 	}
 	allocations, err := database.GetBudgetAllocationsByBudgetPeriodID(periodID)
@@ -166,6 +167,16 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 				continue
 			}
 			result.ImportedCount++
+			if tx.BudgetCategoryID == 0 {
+				result.UncategorizedCount++
+			} else if tx.Currency == "USD" {
+				for _, category := range categories {
+					if category.ID == tx.BudgetCategoryID && category.Type == "Expense" {
+						result.SpentByCategory[category.ID] -= tx.Amount
+						break
+					}
+				}
+			}
 			if tx.Pending {
 				result.ImportedPending++
 			}
