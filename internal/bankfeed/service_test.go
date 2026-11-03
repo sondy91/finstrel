@@ -150,7 +150,7 @@ func TestSyncRestartsWholePaginationAndReconcilesLifecycle(t *testing.T) {
 		}
 	})
 	r := record{Item: emptyItem("local-item", "Old bank name"), Cursor: "base"}
-	r.Item.Transactions = []Transaction{{ID: "pending", Amount: -10, Pending: true}, {ID: "removed"}, {ID: "changed", Amount: -1}}
+	r.Item.Transactions = []Transaction{{ID: "pending", Amount: -10, Pending: true, BudgetCategoryID: 7}, {ID: "removed"}, {ID: "changed", Amount: -1, BudgetCategoryID: 8}}
 	seed(t, s, r)
 	v, err := s.Import(context.Background())
 	if err != nil {
@@ -172,12 +172,33 @@ func TestSyncRestartsWholePaginationAndReconcilesLifecycle(t *testing.T) {
 	amounts := map[string]float64{}
 	for _, row := range v.Items[0].Transactions {
 		amounts[row.ID] = row.Amount
+		if (row.ID == "posted" && row.BudgetCategoryID != 7) || (row.ID == "changed" && row.BudgetCategoryID != 8) {
+			t.Fatalf("category lost during bank sync: %+v", row)
+		}
 		if row.Description != "Statement description" {
 			t.Error("nullable merchant fallback")
 		}
 	}
 	if !reflect.DeepEqual(amounts, map[string]float64{"posted": -12.5, "deposit": 20, "changed": -9}) {
 		t.Fatalf("lifecycle/signs: %v", amounts)
+	}
+}
+
+func TestTransactionCategoryPersistsInSnapshot(t *testing.T) {
+	s, _ := fixtureService(t, func(string, map[string]any) (int, any) { return 500, nil })
+	r := record{Item: emptyItem("local-item", "Bank")}
+	r.Item.Transactions = []Transaction{{ID: "purchase"}}
+	seed(t, s, r)
+	_, err := s.SetTransactionCategory("local-item", "purchase", 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.View()
+	if err != nil || view.Items[0].Transactions[0].BudgetCategoryID != 7 {
+		t.Fatalf("category not persisted: %+v %v", view, err)
+	}
+	if _, err := s.SetTransactionCategory("local-item", "missing", 7); err == nil {
+		t.Fatal("missing transaction accepted")
 	}
 }
 

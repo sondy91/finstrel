@@ -13,7 +13,13 @@ import {
 } from '@/components/ui/dialog';
 import AddTransactionForm from '@/components/AddTransactionForm';
 import { type BankFeedView } from '@/components/BankConnectionsPanel';
-import { GetAccounts, GetBankFeedView, GetCategories, GetTransactions } from '@/wailsAdapter';
+import {
+  GetAccounts,
+  GetBankFeedView,
+  GetCategories,
+  GetTransactions,
+  SetBankTransactionCategory,
+} from '@/wailsAdapter';
 import { models } from '../../wailsjs/go/models';
 import { dayLabel, errorText } from '@/lib/planning';
 import { onBankFeedsUpdated } from '@/lib/bankUpdates';
@@ -38,6 +44,8 @@ type Row = {
   pending: boolean;
   notes: string;
   source: 'connected' | 'manual';
+  itemId?: string;
+  budgetCategoryId?: number;
 };
 const PAGE_SIZE = 25;
 
@@ -64,6 +72,8 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Row | null>(null);
   const [adding, setAdding] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+  const [categorySaving, setCategorySaving] = useState(false);
   const [manualLoading, setManualLoading] = useState(true);
   const [bankLoading, setBankLoading] = useState(true);
   const loading = source === 'connected' ? bankLoading : manualLoading;
@@ -134,7 +144,10 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         id: tx.id,
         date: tx.date,
         description: tx.description,
-        category: categoryLabel(tx.category),
+        category:
+          categories.find((c) => c.id === tx.budgetCategoryId)?.name || categoryLabel(tx.category),
+        itemId: item.id,
+        budgetCategoryId: tx.budgetCategoryId || 0,
         account: account
           ? `${account.name}${account.mask ? ` · ••${account.mask}` : ''}`
           : 'Unavailable account',
@@ -477,7 +490,10 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
       <Dialog
         open={!!selected}
         onOpenChange={(open) => {
-          if (!open) setSelected(null);
+          if (!open) {
+            setSelected(null);
+            setCategoryError('');
+          }
         }}
       >
         <DialogContent className="left-auto right-0 top-0 flex h-full max-h-screen translate-x-0 translate-y-0 flex-col gap-6 overflow-y-auto rounded-none sm:max-w-lg sm:rounded-none">
@@ -500,7 +516,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
               <dl className="space-y-4 text-sm">
                 {[
                   ['Date', dayLabel(selected.date)],
-                  ['Category', selected.category],
+                  ...(selected.source === 'manual' ? [['Category', selected.category]] : []),
                   ['Institution', selected.institution],
                   ['Status', selected.pending ? 'Pending' : 'Posted'],
                   ['Currency', selected.currency || 'Unknown'],
@@ -511,6 +527,50 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
                   </div>
                 ))}
               </dl>
+              {selected.source === 'connected' && (
+                <div className="space-y-2">
+                  <Label htmlFor="bank-budget-category">Budget category</Label>
+                  <Select
+                    id="bank-budget-category"
+                    disabled={categorySaving}
+                    value={String(selected.budgetCategoryId || 0)}
+                    onChange={async (event) => {
+                      const categoryId = Number(event.target.value);
+                      setCategorySaving(true);
+                      try {
+                        const updated: BankFeedView = await SetBankTransactionCategory(
+                          selected.itemId,
+                          selected.id,
+                          categoryId
+                        );
+                        setFeeds(updated);
+                        setSelected((current) =>
+                          current?.key === selected.key
+                            ? { ...current, budgetCategoryId: categoryId }
+                            : current
+                        );
+                        setCategoryError('');
+                      } catch (error) {
+                        setCategoryError(errorText(error));
+                      } finally {
+                        setCategorySaving(false);
+                      }
+                    }}
+                  >
+                    <option value="0">Uncategorized</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </Select>
+                  {categoryError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {categoryError}
+                    </p>
+                  )}
+                </div>
+              )}
               {selected.notes && (
                 <div>
                   <h3 className="text-sm font-medium">Notes</h3>

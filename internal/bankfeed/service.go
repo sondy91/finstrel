@@ -82,6 +82,32 @@ func (s *Service) View() (View, error) {
 	return s.view(state), nil
 }
 
+// SetTransactionCategory stores a user-selected category alongside the encrypted feed.
+func (s *Service) SetTransactionCategory(itemID, transactionID string, categoryID int64) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, err := s.vault.load()
+	if err != nil {
+		return View{}, err
+	}
+	for i := range state.Items {
+		item := &state.Items[i].Item
+		if item.ID != itemID {
+			continue
+		}
+		for j := range item.Transactions {
+			if item.Transactions[j].ID == transactionID {
+				item.Transactions[j].BudgetCategoryID = categoryID
+				if err := s.vault.save(state); err != nil {
+					return View{}, err
+				}
+				return s.view(state), nil
+			}
+		}
+	}
+	return View{}, errors.New("Bank transaction not found. Refresh and try again.")
+}
+
 func (s *Service) ready() error {
 	if s.provider == nil {
 		return errors.New("Set up Plaid Sandbox keys for the Go backend, then restart the app.")
@@ -745,12 +771,22 @@ func (s *Service) syncTransactions(ctx context.Context, token string, r *record)
 		}
 		for _, t := range added {
 			if t != nil {
-				transactions[t.TransactionID] = normalizeTransaction(t)
+				normalized := normalizeTransaction(t)
+				normalized.BudgetCategoryID = transactions[t.TransactionID].BudgetCategoryID
+				if normalized.BudgetCategoryID == 0 && t.PendingTransactionID != nil {
+					normalized.BudgetCategoryID = transactions[*t.PendingTransactionID].BudgetCategoryID
+				}
+				transactions[t.TransactionID] = normalized
 			}
 		}
 		for _, t := range modified {
 			if t != nil {
-				transactions[t.TransactionID] = normalizeTransaction(t)
+				normalized := normalizeTransaction(t)
+				normalized.BudgetCategoryID = transactions[t.TransactionID].BudgetCategoryID
+				if normalized.BudgetCategoryID == 0 && t.PendingTransactionID != nil {
+					normalized.BudgetCategoryID = transactions[*t.PendingTransactionID].BudgetCategoryID
+				}
+				transactions[t.TransactionID] = normalized
 			}
 		}
 		for _, id := range removed {

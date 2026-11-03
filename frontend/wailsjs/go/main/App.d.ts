@@ -92,3 +92,5 @@ export function UpdateCashFlowSettings(arg1:string,arg2:number):Promise<void>;
 export function UpdateCategory(arg1:number,arg2:string,arg3:string,arg4:any,arg5:number):Promise<models.Category>;
 
 export function UpdateCategoryDefaultAmount(arg1:number,arg2:number):Promise<void>;
+
+export function SetBankTransactionCategory(arg1:string,arg2:string,arg3:number):Promise<any>;

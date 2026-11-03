@@ -10,6 +10,7 @@ vi.mock('@/wailsAdapter', () => ({
   GetBankFeedView: vi.fn(),
   GetCategories: vi.fn(),
   GetTransactions: vi.fn(),
+  SetBankTransactionCategory: vi.fn(),
 }));
 const account = {
   id: 'checking',
@@ -93,6 +94,18 @@ beforeEach(() => {
     environment: 'sandbox',
     items: [alpha, beta],
   });
+});
+it('saves a budget category for a connected transaction', async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.SetBankTransactionCategory).mockResolvedValue({
+    configured: true,
+    environment: 'sandbox',
+    items: [{ ...alpha, transactions: [{ ...tx, budgetCategoryId: 1 }] }],
+  });
+  render(<TransactionsPage />);
+  await user.click(await screen.findByText('Grocery store'));
+  await user.selectOptions(screen.getByLabelText('Budget category'), '1');
+  expect(api.SetBankTransactionCategory).toHaveBeenCalledWith('alpha', 'same-id', 1);
 });
 it('keeps connected/manual records and currencies separate', async () => {
   const user = userEvent.setup();
