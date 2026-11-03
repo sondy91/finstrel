@@ -112,12 +112,12 @@ export default function SettingsPage({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Income schedules in Calendar determine the next payday when active. This date is a
+              fallback when no income schedule is active.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  Income schedules in Calendar determine the next payday when active. This date is a
-                  fallback when no income schedule is active.
-                </p>
                 <Label htmlFor="payday">Fallback next paycheck date</Label>
                 <Input
                   id="payday"
