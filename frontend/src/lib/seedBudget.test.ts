@@ -1,10 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AddBudgetPeriod } from '../wailsAdapter';
+import { SeedOnboarding } from '../wailsAdapter';
 import { seedInitialBudget } from './seedBudget';
 
 vi.mock('../wailsAdapter', () => ({
-  AddBudgetPeriod: vi.fn().mockResolvedValue({ id: 1 }),
-  AddCategoryWithDefault: vi.fn(),
+  SeedOnboarding: vi.fn().mockResolvedValue(undefined),
 }));
 
 afterEach(() => {
@@ -20,12 +19,23 @@ it('uses the chosen first period rather than the current month', async () => {
     defaultAmounts: {},
     budgetStartDate: '2026-10-23',
     budgetEndDate: '2026-11-05',
+    paychecks: [
+      { name: 'Pay', amount: 500, cadence: 'weekly', anchorDate: '2026-10-23', secondDay: 0 },
+    ],
   });
-  expect(AddBudgetPeriod).toHaveBeenLastCalledWith(
+  expect(SeedOnboarding).toHaveBeenLastCalledWith(
     'October 2026 Budget',
     '2026-10-23',
     '2026-11-05',
-    'Open'
+    [],
+    [
+      {
+        name: 'Pay',
+        amount: 500,
+        active: true,
+        schedule: { cadence: 'weekly', anchorDate: '2026-10-23', secondDay: 0, endDate: '' },
+      },
+    ]
   );
 });
 
@@ -39,10 +49,11 @@ it('creates the initial budget with calendar dates through the last day of the m
     categories: [],
     defaultAmounts: {},
   });
-  expect(AddBudgetPeriod).toHaveBeenCalledWith(
+  expect(SeedOnboarding).toHaveBeenCalledWith(
     'November 2026 Budget',
     '2026-11-01',
     '2026-11-30',
-    'Open'
+    [],
+    []
   );
 });

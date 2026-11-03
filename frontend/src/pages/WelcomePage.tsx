@@ -21,24 +21,16 @@ import BankConnectionsPanel from '@/components/BankConnectionsPanel';
 import BudgetDateFields from '@/components/BudgetDateFields';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Steps } from '@/components/ui/steps';
-import { saveOnboardingData } from '@/lib/onboarding';
+import { saveOnboardingData, type OnboardingData } from '@/lib/onboarding';
 import { dateKey } from '@/lib/planning';
 
 type WelcomePageProps = {
   onGetStarted: () => void;
   onPractice?: () => void;
 };
-type OnboardingData = {
-  accentColor: string;
-  themeMode: 'light' | 'dark';
-  goals: string[];
-  categories: string[];
-  defaultAmounts: Record<string, number>;
-  budgetStartDate?: string;
-  budgetEndDate?: string;
-};
-
 const LogoMark = () => <BrandMark className="mx-auto mb-6 h-32 w-32" />;
 
 export default function WelcomePage({ onGetStarted, onPractice }: WelcomePageProps) {
@@ -64,6 +56,9 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
     return dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   });
   const [budgetCadence, setBudgetCadence] = useState('monthly');
+  const [paychecks, setPaychecks] = useState<
+    { name: string; amount: string; cadence: string; anchorDate: string; secondDay: string }[]
+  >([]);
 
   const goalOptions = [
     { id: 'debt', label: 'Pay off debt', Icon: CreditCard },
@@ -121,6 +116,7 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
     'Categories',
     'Amounts',
     'Budget period',
+    'Paychecks',
     'Connect accounts',
   ];
   const steps = labels.map((label, index) => ({ id: index + 1, label }));
@@ -135,6 +131,22 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
     }
     if (step === 'About you' && withPartner === null) return false;
     if (step === 'Budget period' && (!budgetStart || !budgetEnd || budgetEnd <= budgetStart))
+      return false;
+    if (
+      step === 'Paychecks' &&
+      paychecks.some(
+        (paycheck) =>
+          !paycheck.name.trim() ||
+          paycheck.amount === '' ||
+          !Number.isFinite(Number(paycheck.amount)) ||
+          Number(paycheck.amount) < 0 ||
+          !paycheck.anchorDate ||
+          (paycheck.cadence === 'semimonthly' &&
+            (!Number.isInteger(Number(paycheck.secondDay)) ||
+              Number(paycheck.secondDay) <= Number(paycheck.anchorDate.slice(8, 10)) ||
+              Number(paycheck.secondDay) > 31))
+      )
+    )
       return false;
     return true;
   };
@@ -151,6 +163,12 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
         ...onboardingData,
         budgetStartDate: budgetStart,
         budgetEndDate: budgetEnd,
+        paychecks: paychecks.map((paycheck) => ({
+          ...paycheck,
+          name: paycheck.name.trim(),
+          amount: Number(paycheck.amount),
+          secondDay: paycheck.cadence === 'semimonthly' ? Number(paycheck.secondDay) : 0,
+        })),
         defaultAmounts: Object.fromEntries(
           onboardingData.categories.map((categoryId) => {
             const amount = Number(defaultAmountDrafts[categoryId]);
@@ -251,6 +269,14 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                 <h1 className="text-3xl font-semibold tracking-tight">
                   Set your first budget period
                 </h1>
+              )}
+              {step === 'Paychecks' && (
+                <div className="space-y-3">
+                  <h1 className="text-3xl font-semibold tracking-tight">Add paychecks</h1>
+                  <p className="text-sm text-muted-foreground">
+                    Optional. Each paycheck can have its own schedule.
+                  </p>
+                </div>
               )}
             </CardHeader>
             <CardContent className="flex flex-col min-h-[420px]">
@@ -408,6 +434,117 @@ export default function WelcomePage({ onGetStarted, onPractice }: WelcomePagePro
                       onCadenceChange={setBudgetCadence}
                       showHint={false}
                     />
+                  </div>
+                )}
+                {step === 'Paychecks' && (
+                  <div className="w-full max-w-md space-y-4">
+                    {paychecks.map((paycheck, index) => {
+                      const update = (field: string, value: string) =>
+                        setPaychecks((current) =>
+                          current.map((item, i) =>
+                            i === index ? { ...item, [field]: value } : item
+                          )
+                        );
+                      return (
+                        <section
+                          key={index}
+                          aria-label={`Paycheck ${index + 1}`}
+                          className="space-y-3 rounded-lg border p-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <strong>Paycheck {index + 1}</strong>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setPaychecks((current) => current.filter((_, i) => i !== index))
+                              }
+                              aria-label={`Remove paycheck ${index + 1}`}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <div>
+                            <Label htmlFor={`pay-name-${index}`}>Name</Label>
+                            <Input
+                              id={`pay-name-${index}`}
+                              value={paycheck.name}
+                              onChange={(event) => update('name', event.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label htmlFor={`pay-amount-${index}`}>Amount</Label>
+                              <Input
+                                id={`pay-amount-${index}`}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={paycheck.amount}
+                                onChange={(event) => update('amount', event.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`pay-date-${index}`}>Last or next payday</Label>
+                              <Input
+                                id={`pay-date-${index}`}
+                                type="date"
+                                value={paycheck.anchorDate}
+                                onChange={(event) => update('anchorDate', event.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor={`pay-frequency-${index}`}>Frequency</Label>
+                            <Select
+                              id={`pay-frequency-${index}`}
+                              value={paycheck.cadence}
+                              onChange={(event) => update('cadence', event.target.value)}
+                            >
+                              <option value="weekly">Weekly</option>
+                              <option value="biweekly">Every 2 weeks</option>
+                              <option value="threeweekly">Every 3 weeks</option>
+                              <option value="semimonthly">Twice monthly</option>
+                              <option value="monthly">Monthly</option>
+                            </Select>
+                          </div>
+                          {paycheck.cadence === 'semimonthly' && (
+                            <div>
+                              <Label htmlFor={`pay-second-${index}`}>Second day of month</Label>
+                              <Input
+                                id={`pay-second-${index}`}
+                                type="number"
+                                min="1"
+                                max="31"
+                                step="1"
+                                value={paycheck.secondDay}
+                                onChange={(event) => update('secondDay', event.target.value)}
+                              />
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Choose the earlier monthly payday above.
+                              </p>
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setPaychecks((current) => [
+                          ...current,
+                          {
+                            name: '',
+                            amount: '',
+                            cadence: 'biweekly',
+                            anchorDate: '',
+                            secondDay: '',
+                          },
+                        ])
+                      }
+                    >
+                      Add a paycheck
+                    </Button>
                   </div>
                 )}
                 {step === 'Categories' && (

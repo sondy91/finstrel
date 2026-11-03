@@ -146,6 +146,10 @@ export function SaveIncomeSchedule(arg1) {
   return window['go']['main']['App']['SaveIncomeSchedule'](arg1);
 }
 
+export function SeedOnboarding(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SeedOnboarding'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function SetBankTransactionCategory(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetBankTransactionCategory'](arg1, arg2, arg3);
 }

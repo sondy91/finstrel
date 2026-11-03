@@ -3,7 +3,7 @@
  * Creates default budget period and categories based on user choices
  */
 
-import { AddBudgetPeriod, AddCategoryWithDefault } from '../wailsAdapter';
+import { SeedOnboarding } from '../wailsAdapter';
 import type { OnboardingData } from './onboarding';
 import { dateKey } from './planning';
 
@@ -63,32 +63,28 @@ function getCurrentMonthDates(): { startDate: string; endDate: string } {
  */
 export async function seedInitialBudget(data: OnboardingData): Promise<void> {
   try {
-    console.log('Seeding initial budget from onboarding data:', data);
-
-    // 1. Create category templates before the first period.
-    for (const categoryId of data.categories) {
-      const categoryName = CATEGORY_MAP[categoryId];
-      if (!categoryName) {
-        console.warn(`Unknown category ID: ${categoryId}`);
-        continue;
-      }
-
-      const defaultAmount = data.defaultAmounts?.[categoryId] ?? 0;
-      const category = await AddCategoryWithDefault(categoryName, 'Expense', null, defaultAmount);
-      console.log(`Created category: ${categoryName}`, category);
-    }
-
-    // 2. New periods copy all saved category defaults.
     const fallback = getCurrentMonthDates();
     const startDate = data.budgetStartDate || fallback.startDate;
     const endDate = data.budgetEndDate || fallback.endDate;
-    const period = await AddBudgetPeriod(
-      getDefaultPeriodName(startDate),
-      startDate,
-      endDate,
-      'Open'
-    );
-    console.log('Created populated budget period:', period);
+    const categories = data.categories
+      .filter((id) => CATEGORY_MAP[id])
+      .map((id) => ({
+        name: CATEGORY_MAP[id],
+        type: 'Expense',
+        defaultAmount: data.defaultAmounts?.[id] ?? 0,
+      }));
+    const incomes = (data.paychecks || []).map((paycheck) => ({
+      name: paycheck.name,
+      amount: paycheck.amount,
+      active: true,
+      schedule: {
+        cadence: paycheck.cadence,
+        anchorDate: paycheck.anchorDate,
+        secondDay: paycheck.secondDay,
+        endDate: '',
+      },
+    }));
+    await SeedOnboarding(getDefaultPeriodName(startDate), startDate, endDate, categories, incomes);
 
     console.log('Initial budget seeding complete');
   } catch (error) {

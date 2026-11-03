@@ -33,6 +33,37 @@ func (a *App) SaveIncomeSchedule(i models.IncomeSchedule) (models.IncomeSchedule
 	}
 	return database.SaveIncomeSchedule(i)
 }
+
+func (a *App) SeedOnboarding(name, start, end string, categories []models.Category, incomes []models.IncomeSchedule) error {
+	begin, err := parseBudgetPeriodDate(start)
+	if err != nil {
+		return err
+	}
+	finish, err := parseBudgetPeriodDate(end)
+	if err != nil || !finish.After(begin) {
+		return fmt.Errorf("choose a valid budget period")
+	}
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("enter a budget name")
+	}
+	for _, category := range categories {
+		if category.Type != "Expense" {
+			return fmt.Errorf("choose an expense category")
+		}
+		if err := validPlannedAmount(category.Name, category.DefaultAmount); err != nil {
+			return err
+		}
+	}
+	for _, income := range incomes {
+		if err := validPlannedAmount(income.Name, income.Amount); err != nil {
+			return err
+		}
+		if err := income.Schedule.Validate(); err != nil {
+			return err
+		}
+	}
+	return database.SeedOnboarding(models.BudgetPeriod{Name: name, StartDate: begin, EndDate: finish}, categories, incomes)
+}
 func (a *App) SaveBillSchedule(b models.Bill) (models.Bill, error) {
 	if b.ID < 0 || b.CategoryID <= 0 {
 		return b, fmt.Errorf("choose an expense category")

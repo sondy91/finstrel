@@ -19,6 +19,38 @@ func TestBudgetPresetsUseInclusiveDateRanges(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestOnboardingSetupIsAtomicAndProtectsExistingData(t *testing.T) {
+	cleanup := setupTempDBAppForAccount(t)
+	defer cleanup()
+	app := NewApp()
+	categories := []models.Category{{Name: "Food", Type: "Expense", DefaultAmount: 100}, {Name: "Food", Type: "Expense", DefaultAmount: 200}}
+	incomes := []models.IncomeSchedule{{Name: "Pay", Amount: 500, Schedule: schedule.Rule{Cadence: "weekly", AnchorDate: "2026-10-02"}}}
+	err := app.SeedOnboarding("October", "2026-10-01", "2026-10-31", categories, incomes)
+	require.Error(t, err)
+	cats, err := app.GetCategories()
+	require.NoError(t, err)
+	require.Empty(t, cats)
+	periods, err := app.GetBudgetPeriods()
+	require.NoError(t, err)
+	require.Empty(t, periods)
+	incomeRows, err := app.GetIncomeSchedules()
+	require.NoError(t, err)
+	require.Empty(t, incomeRows)
+	require.NoError(t, app.SeedOnboarding("October", "2026-10-01", "2026-10-31", categories[:1], incomes))
+	require.Error(t, app.SeedOnboarding("October", "2026-10-01", "2026-10-31", categories[:1], incomes))
+	periods, err = app.GetBudgetPeriods()
+	require.NoError(t, err)
+	require.Len(t, periods, 1)
+	incomeRows, err = app.GetIncomeSchedules()
+	require.NoError(t, err)
+	require.Len(t, incomeRows, 1)
+	require.True(t, incomeRows[0].Active)
+	allocations, err := app.GetBudgetAllocationsByBudgetPeriodID(periods[0].ID)
+	require.NoError(t, err)
+	require.Len(t, allocations, 1)
+	require.Equal(t, 100.0, allocations[0].AllocatedAmount)
+}
+
 func TestBudgetReviewCountsIndependentIncomeSchedules(t *testing.T) {
 	cleanup := setupTempDBAppForAccount(t)
 	defer cleanup()

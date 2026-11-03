@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -60,7 +60,7 @@ describe('WelcomePage', () => {
     expect(cta).toBeInTheDocument();
 
     const stepIndicators = screen.getAllByLabelText(/wizard step/i);
-    expect(stepIndicators).toHaveLength(8);
+    expect(stepIndicators).toHaveLength(9);
     expect(stepIndicators[0]).toHaveAttribute('data-active', 'true');
 
     await user.click(cta);
@@ -169,6 +169,20 @@ describe('WelcomePage', () => {
     expect(screen.getByLabelText('Start Date')).toHaveValue('2026-10-23');
     expect(screen.getByLabelText('End Date')).toHaveValue('2026-11-05');
     await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(await screen.findByRole('heading', { name: 'Add paychecks' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add a paycheck' }));
+    await user.type(screen.getByLabelText('Name'), 'My pay');
+    await user.type(screen.getByLabelText('Amount'), '1200');
+    await user.type(screen.getByLabelText('Last or next payday'), '2026-10-23');
+    await user.click(screen.getByRole('button', { name: 'Add a paycheck' }));
+    const partner = screen.getByRole('region', { name: 'Paycheck 2' });
+    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+    await user.type(within(partner).getByLabelText('Name'), 'Partner pay');
+    await user.type(within(partner).getByLabelText('Amount'), '800');
+    await user.type(within(partner).getByLabelText('Last or next payday'), '2026-10-01');
+    await user.selectOptions(within(partner).getByLabelText('Frequency'), 'semimonthly');
+    await user.type(within(partner).getByLabelText('Second day of month'), '15');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
     expect(screen.getByText(/bank connection controls/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /finish setup/i }));
     expect(onGetStarted).toHaveBeenCalledOnce();
@@ -179,6 +193,22 @@ describe('WelcomePage', () => {
       defaultAmounts: { groceries: 275.5, utilities: 0 },
       budgetStartDate: '2026-10-23',
       budgetEndDate: '2026-11-05',
+      paychecks: [
+        {
+          name: 'My pay',
+          amount: 1200,
+          cadence: 'biweekly',
+          anchorDate: '2026-10-23',
+          secondDay: 0,
+        },
+        {
+          name: 'Partner pay',
+          amount: 800,
+          cadence: 'semimonthly',
+          anchorDate: '2026-10-01',
+          secondDay: 15,
+        },
+      ],
     });
   });
 

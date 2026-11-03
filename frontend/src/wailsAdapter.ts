@@ -75,6 +75,7 @@ export const CancelBankLink = call('CancelBankLink');
 
 export const GetIncomeSchedules = call('GetIncomeSchedules');
 export const SaveIncomeSchedule = call('SaveIncomeSchedule');
+export const SeedOnboarding = call('SeedOnboarding');
 export const SaveBillSchedule = call('SaveBillSchedule');
 export const GetPlanningCalendar = call('GetPlanningCalendar');
 export const PreviewBudgetWindow = call('PreviewBudgetWindow');

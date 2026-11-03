@@ -13,6 +13,13 @@ export type OnboardingData = {
   categories: string[];
   budgetStartDate?: string;
   budgetEndDate?: string;
+  paychecks?: {
+    name: string;
+    amount: number;
+    cadence: string;
+    anchorDate: string;
+    secondDay: number;
+  }[];
   defaultAmounts: Record<string, number>;
 };
 

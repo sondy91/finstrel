@@ -75,6 +75,8 @@ export function SaveBillSchedule(arg1:models.Bill):Promise<models.Bill>;
 
 export function SaveIncomeSchedule(arg1:models.IncomeSchedule):Promise<models.IncomeSchedule>;
 
+export function SeedOnboarding(arg1:string,arg2:string,arg3:string,arg4:Array<models.Category>,arg5:Array<models.IncomeSchedule>):Promise<void>;
+
 export function SetBankTransactionCategory(arg1:string,arg2:string,arg3:number):Promise<bankfeed.View>;
 
 export function SetBankTransactionExcluded(arg1:string,arg2:string,arg3:boolean):Promise<bankfeed.View>;
