@@ -121,6 +121,28 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 		return result, fmt.Errorf("budget period not found")
 	}
 	start, end := period.StartDate.Format(schedule.Layout), period.EndDate.Format(schedule.Layout)
+	incomes, err := database.GetIncomeSchedules()
+	if err != nil {
+		return result, err
+	}
+	for _, income := range incomes {
+		if !income.Active {
+			continue
+		}
+		result.ActiveIncomeSchedules++
+		for chunkStart := period.StartDate; !chunkStart.After(period.EndDate); {
+			chunkEnd := chunkStart.AddDate(5, 0, -1)
+			if chunkEnd.After(period.EndDate) {
+				chunkEnd = period.EndDate
+			}
+			dates, err := schedule.Dates(income.Schedule, chunkStart.Format(schedule.Layout), chunkEnd.Format(schedule.Layout))
+			if err != nil {
+				return result, fmt.Errorf("cannot calculate income schedule: %w", err)
+			}
+			result.ExpectedScheduledIncome += float64(len(dates)) * income.Amount
+			chunkStart = chunkEnd.AddDate(0, 0, 1)
+		}
+	}
 	txs, err := database.GetTransactions()
 	if err != nil {
 		return result, err

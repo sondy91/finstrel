@@ -24,6 +24,8 @@ type BudgetWindow struct {
 }
 
 type BudgetReview struct {
+	ExpectedScheduledIncome  float64             `json:"expectedScheduledIncome"`
+	ActiveIncomeSchedules    int                 `json:"activeIncomeSchedules"`
 	SpentByCategory          map[int64]float64   `json:"spentByCategory"`
 	IncomeByCategory         map[int64]float64   `json:"incomeByCategory"`
 	UncategorizedCount       int                 `json:"uncategorizedCount"`

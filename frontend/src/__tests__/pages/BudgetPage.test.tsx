@@ -112,6 +112,8 @@ describe('BudgetPage', () => {
     (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({
       spentByCategory: { 1: 125 },
       incomeByCategory: { 3: 700 },
+      activeIncomeSchedules: 2,
+      expectedScheduledIncome: 2100,
     });
     render(<BudgetPage />);
     await userEvent.click(await screen.findByText('August 2025'));
@@ -119,6 +121,7 @@ describe('BudgetPage', () => {
     expect(within(groceries).getByText('$125.00')).toBeInTheDocument();
     expect(within(groceries).getByText('$375.00')).toBeInTheDocument();
     const pay = screen.getByText('Pay').closest('tr')!;
+    expect(screen.getByText('Expected scheduled income: $2,100.00')).toBeInTheDocument();
     expect(within(pay).getByText('$700.00')).toBeInTheDocument();
     expect(within(pay).getByText('$300.00')).toBeInTheDocument();
   });

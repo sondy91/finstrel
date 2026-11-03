@@ -70,6 +70,8 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
   const [activity, setActivity] = useState<{
     spentByCategory: Record<number, number>;
     incomeByCategory: Record<number, number>;
+    expectedScheduledIncome: number;
+    activeIncomeSchedules: number;
   } | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [activityWarnings, setActivityWarnings] = useState<string[]>([]);
@@ -243,6 +245,8 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
         setActivity({
           spentByCategory: review.spentByCategory || {},
           incomeByCategory: review.incomeByCategory || {},
+          expectedScheduledIncome: review.expectedScheduledIncome || 0,
+          activeIncomeSchedules: review.activeIncomeSchedules || 0,
         });
         const warnings: string[] = [];
         if (review.uncategorizedCount)
@@ -443,6 +447,11 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
             <CardHeader className="flex flex-row items-center justify-between">
               <div className="flex items-center gap-4">
                 <CardTitle>Envelopes for: {selectedPeriod.name}</CardTitle>
+                {activity && activity.activeIncomeSchedules > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Expected scheduled income: {money(activity.expectedScheduledIncome)}
+                  </p>
+                )}
                 <Button variant="ghost" size="icon" onClick={openEditPeriodDialog}>
                   <Edit2 className="h-4 w-4" />
                 </Button>

@@ -19,6 +19,28 @@ func TestBudgetPresetsUseInclusiveDateRanges(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestBudgetReviewCountsIndependentIncomeSchedules(t *testing.T) {
+	cleanup := setupTempDBAppForAccount(t)
+	defer cleanup()
+	app := NewApp()
+	period, err := app.AddBudgetPeriod("October", "2026-10-01", "2026-10-31", "Open")
+	require.NoError(t, err)
+	for _, income := range []models.IncomeSchedule{
+		{Name: "Weekly", Amount: 100, Active: true, Schedule: schedule.Rule{Cadence: "weekly", AnchorDate: "2026-10-02"}},
+		{Name: "Biweekly", Amount: 200, Active: true, Schedule: schedule.Rule{Cadence: "biweekly", AnchorDate: "2026-10-02"}},
+		{Name: "Twice monthly", Amount: 300, Active: true, Schedule: schedule.Rule{Cadence: "semimonthly", AnchorDate: "2026-10-01", SecondDay: 15}},
+		{Name: "Monthly", Amount: 400, Active: true, Schedule: schedule.Rule{Cadence: "monthly", AnchorDate: "2026-10-05"}},
+		{Name: "Inactive", Amount: 999, Active: false, Schedule: schedule.Rule{Cadence: "weekly", AnchorDate: "2026-10-01"}},
+	} {
+		_, err = app.SaveIncomeSchedule(income)
+		require.NoError(t, err)
+	}
+	review, err := reviewBudget(period.ID, func() (bankfeed.View, error) { return bankfeed.View{}, nil })
+	require.NoError(t, err)
+	require.Equal(t, 4, review.ActiveIncomeSchedules)
+	require.Equal(t, 2100.0, review.ExpectedScheduledIncome)
+}
+
 func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
 	cleanup := setupTempDBAppForAccount(t)
 	defer cleanup()
