@@ -11,6 +11,7 @@ vi.mock('@/wailsAdapter', () => ({
   GetCategories: vi.fn(),
   GetTransactions: vi.fn(),
   SetBankTransactionCategory: vi.fn(),
+  SetBankTransactionExcluded: vi.fn(),
 }));
 const account = {
   id: 'checking',
@@ -106,6 +107,19 @@ it('saves a budget category for a connected transaction', async () => {
   await user.click(await screen.findByText('Grocery store'));
   await user.selectOptions(screen.getByLabelText('Budget category'), '1');
   expect(api.SetBankTransactionCategory).toHaveBeenCalledWith('alpha', 'same-id', 1);
+});
+it('can exclude a bank transaction from budget totals', async () => {
+  const user = userEvent.setup();
+  vi.mocked(api.SetBankTransactionExcluded).mockResolvedValue({
+    configured: true,
+    environment: 'sandbox',
+    items: [{ ...alpha, transactions: [{ ...tx, excludeFromBudget: true }] }],
+  });
+  render(<TransactionsPage />);
+  await user.click(await screen.findByText('Grocery store'));
+  await user.click(screen.getByRole('checkbox', { name: 'Include in budget' }));
+  expect(api.SetBankTransactionExcluded).toHaveBeenCalledWith('alpha', 'same-id', true);
+  expect(screen.getByRole('checkbox', { name: 'Include in budget' })).not.toBeChecked();
 });
 it('keeps connected/manual records and currencies separate', async () => {
   const user = userEvent.setup();

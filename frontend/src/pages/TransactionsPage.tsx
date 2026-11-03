@@ -19,6 +19,7 @@ import {
   GetCategories,
   GetTransactions,
   SetBankTransactionCategory,
+  SetBankTransactionExcluded,
 } from '@/wailsAdapter';
 import { models } from '../../wailsjs/go/models';
 import { dayLabel, errorText } from '@/lib/planning';
@@ -41,6 +42,7 @@ type Row = {
   source: 'connected' | 'manual';
   itemId?: string;
   budgetCategoryId?: number;
+  excludeFromBudget?: boolean;
 };
 const PAGE_SIZE = 25;
 
@@ -142,6 +144,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         category: categories.find((c) => c.id === tx.budgetCategoryId)?.name || 'Uncategorized',
         itemId: item.id,
         budgetCategoryId: tx.budgetCategoryId || 0,
+        excludeFromBudget: tx.excludeFromBudget || false,
         account: account
           ? `${account.name}${account.mask ? ` · ••${account.mask}` : ''}`
           : 'Unavailable account',
@@ -558,6 +561,36 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
                       </option>
                     ))}
                   </Select>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={!selected.excludeFromBudget}
+                      disabled={categorySaving}
+                      onChange={async (event) => {
+                        const excluded = !event.target.checked;
+                        setCategorySaving(true);
+                        try {
+                          const updated: BankFeedView = await SetBankTransactionExcluded(
+                            selected.itemId,
+                            selected.id,
+                            excluded
+                          );
+                          setFeeds(updated);
+                          setSelected((current) =>
+                            current?.key === selected.key
+                              ? { ...current, excludeFromBudget: excluded }
+                              : current
+                          );
+                          setCategoryError('');
+                        } catch (error) {
+                          setCategoryError(errorText(error));
+                        } finally {
+                          setCategorySaving(false);
+                        }
+                      }}
+                    />
+                    Include in budget
+                  </label>
                   {categoryError && (
                     <p role="alert" className="text-sm text-destructive">
                       {categoryError}

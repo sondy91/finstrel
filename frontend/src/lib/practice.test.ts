@@ -51,6 +51,12 @@ describe('practice household isolation', () => {
     const updated = await practice.call('GetBudgetReview', [1]);
     expect(updated.spentByCategory[3]).toBe(66);
     expect(updated.uncategorizedCount).toBe(1);
+    await practice.call('SetBankTransactionExcluded', [
+      'practice-example-bank',
+      'practice-example-dinner',
+      true,
+    ]);
+    expect((await practice.call('GetBudgetReview', [1])).spentByCategory[3]).toBe(42);
     expect(source.items[0].transactions[0].budgetCategoryId).toBeUndefined();
     const reset = await practice.reset().call('GetBankFeedView', []);
     expect(

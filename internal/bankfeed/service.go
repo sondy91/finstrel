@@ -84,6 +84,14 @@ func (s *Service) View() (View, error) {
 
 // SetTransactionCategory stores a user-selected category alongside the encrypted feed.
 func (s *Service) SetTransactionCategory(itemID, transactionID string, categoryID int64) (View, error) {
+	return s.updateTransaction(itemID, transactionID, func(t *Transaction) { t.BudgetCategoryID = categoryID })
+}
+
+func (s *Service) SetTransactionExcluded(itemID, transactionID string, excluded bool) (View, error) {
+	return s.updateTransaction(itemID, transactionID, func(t *Transaction) { t.ExcludeFromBudget = excluded })
+}
+
+func (s *Service) updateTransaction(itemID, transactionID string, update func(*Transaction)) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state, err := s.vault.load()
@@ -97,7 +105,7 @@ func (s *Service) SetTransactionCategory(itemID, transactionID string, categoryI
 		}
 		for j := range item.Transactions {
 			if item.Transactions[j].ID == transactionID {
-				item.Transactions[j].BudgetCategoryID = categoryID
+				update(&item.Transactions[j])
 				if err := s.vault.save(state); err != nil {
 					return View{}, err
 				}
@@ -769,23 +777,15 @@ func (s *Service) syncTransactions(ctx context.Context, token string, r *record)
 		for _, t := range r.Item.Transactions {
 			transactions[t.ID] = t
 		}
-		for _, t := range added {
+		for _, t := range append(added, modified...) {
 			if t != nil {
 				normalized := normalizeTransaction(t)
-				normalized.BudgetCategoryID = transactions[t.TransactionID].BudgetCategoryID
-				if normalized.BudgetCategoryID == 0 && t.PendingTransactionID != nil {
-					normalized.BudgetCategoryID = transactions[*t.PendingTransactionID].BudgetCategoryID
+				previous, exists := transactions[t.TransactionID]
+				if !exists && t.PendingTransactionID != nil {
+					previous = transactions[*t.PendingTransactionID]
 				}
-				transactions[t.TransactionID] = normalized
-			}
-		}
-		for _, t := range modified {
-			if t != nil {
-				normalized := normalizeTransaction(t)
-				normalized.BudgetCategoryID = transactions[t.TransactionID].BudgetCategoryID
-				if normalized.BudgetCategoryID == 0 && t.PendingTransactionID != nil {
-					normalized.BudgetCategoryID = transactions[*t.PendingTransactionID].BudgetCategoryID
-				}
+				normalized.BudgetCategoryID = previous.BudgetCategoryID
+				normalized.ExcludeFromBudget = previous.ExcludeFromBudget
 				transactions[t.TransactionID] = normalized
 			}
 		}

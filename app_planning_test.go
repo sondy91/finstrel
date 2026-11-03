@@ -32,6 +32,8 @@ func TestReviewIncludesCategorizedBankTransactions(t *testing.T) {
 			{Date: "2020-01-20", Currency: "USD", Amount: -35, BudgetCategoryID: category.ID},
 			{Date: "2020-01-21", Currency: "USD", Amount: 5, BudgetCategoryID: category.ID},
 			{Date: "2020-01-22", Currency: "USD", Amount: -20},
+			{Date: "2020-01-23", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID, ExcludeFromBudget: true},
+			{Date: "2020-01-24", Currency: "USD", Amount: -25, ExcludeFromBudget: true},
 			{Date: "2020-02-01", Currency: "USD", Amount: -100, BudgetCategoryID: category.ID},
 		}}}}, nil
 	})

@@ -167,20 +167,20 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 				continue
 			}
 			result.ImportedCount++
-			if tx.Currency != "USD" {
+			if tx.Currency != "USD" && !tx.ExcludeFromBudget {
 				result.UnsupportedCurrencyCount++
 			}
 			found := false
 			for _, category := range categories {
 				if category.ID == tx.BudgetCategoryID {
 					found = true
-					if category.Type == "Expense" && tx.Currency == "USD" {
+					if category.Type == "Expense" && tx.Currency == "USD" && !tx.ExcludeFromBudget {
 						result.SpentByCategory[category.ID] -= tx.Amount
 					}
 					break
 				}
 			}
-			if !found {
+			if !found && !tx.ExcludeFromBudget {
 				result.UncategorizedCount++
 			}
 			if tx.Pending {

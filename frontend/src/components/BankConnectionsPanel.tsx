@@ -43,6 +43,7 @@ export interface BankFeedTransaction {
   currency: string;
   category: string;
   budgetCategoryId?: number;
+  excludeFromBudget?: boolean;
   amount: number;
   pending: boolean;
 }

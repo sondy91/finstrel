@@ -92,6 +92,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
   feeds.items.forEach((item) =>
     item.transactions.forEach((transaction) => {
       transaction.budgetCategoryId = 0;
+      transaction.excludeFromBudget = false;
     })
   );
   shiftTimeline(
@@ -253,6 +254,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
         spentByCategory[t.categoryId] = (spentByCategory[t.categoryId] || 0) + Math.abs(t.amount);
     for (const t of imported)
       if (
+        !t.excludeFromBudget &&
         t.budgetCategoryId &&
         t.currency === 'USD' &&
         categories.some((c) => c.id === t.budgetCategoryId && c.type === 'Expense')
@@ -262,7 +264,8 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       manualCount: manual.length,
       manualPending: manual.filter((t) => t.status === 'Pending').length,
       spentByCategory,
-      uncategorizedCount: imported.filter((t) => !t.budgetCategoryId).length,
+      uncategorizedCount: imported.filter((t) => !t.budgetCategoryId && !t.excludeFromBudget)
+        .length,
       manualExpenses: manual
         .filter((t) => t.type === 'Expense')
         .reduce((sum, t) => sum + Math.abs(t.amount), 0),
@@ -324,6 +327,14 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       if (!transaction || (categoryId && !categories.some((c) => c.id === categoryId)))
         throw new Error('Transaction or category not found.');
       transaction.budgetCategoryId = categoryId;
+      return feeds;
+    },
+    SetBankTransactionExcluded: (itemId: string, transactionId: string, excluded: boolean) => {
+      const transaction = feeds.items
+        .find((item) => item.id === itemId)
+        ?.transactions.find((t) => t.id === transactionId);
+      if (!transaction) throw new Error('Transaction not found.');
+      transaction.excludeFromBudget = excluded;
       return feeds;
     },
     UpdateBudgetPeriodStatus: (id: number, status: string) => {

@@ -38,6 +38,15 @@ func (a *App) SetBankTransactionCategory(itemID, transactionID string, categoryI
 	return s.SetTransactionCategory(itemID, transactionID, categoryID)
 }
 
+// SetBankTransactionExcluded toggles a bank transaction's budget participation.
+func (a *App) SetBankTransactionExcluded(itemID, transactionID string, excluded bool) (bankfeed.View, error) {
+	s, err := a.bankService()
+	if err != nil {
+		return bankfeed.View{}, err
+	}
+	return s.SetTransactionExcluded(itemID, transactionID, excluded)
+}
+
 func (a *App) bankService() (*bankfeed.Service, error) {
 	a.bankMu.Lock()
 	defer a.bankMu.Unlock()

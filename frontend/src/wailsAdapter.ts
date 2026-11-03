@@ -64,6 +64,7 @@ export const ClearAllData = call('ClearAllData');
 // Optional bank feeds: all provider calls and credentials stay in Go.
 export const GetBankFeedView = call('GetBankFeedView');
 export const SetBankTransactionCategory = call('SetBankTransactionCategory');
+export const SetBankTransactionExcluded = call('SetBankTransactionExcluded');
 export const StartBankLink = call('StartBankLink');
 export const FinishBankLink = call('FinishBankLink');
 export const ImportBankFeeds = call('ImportBankFeeds');

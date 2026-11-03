@@ -75,6 +75,10 @@ export function SaveBillSchedule(arg1:models.Bill):Promise<models.Bill>;
 
 export function SaveIncomeSchedule(arg1:models.IncomeSchedule):Promise<models.IncomeSchedule>;
 
+export function SetBankTransactionCategory(arg1:string,arg2:string,arg3:number):Promise<bankfeed.View>;
+
+export function SetBankTransactionExcluded(arg1:string,arg2:string,arg3:boolean):Promise<bankfeed.View>;
+
 export function StartBankLink(arg1:string):Promise<string>;
 
 export function UpdateAccountCashFlowInclusion(arg1:number,arg2:boolean):Promise<void>;
@@ -92,5 +96,3 @@ export function UpdateCashFlowSettings(arg1:string,arg2:number):Promise<void>;
 export function UpdateCategory(arg1:number,arg2:string,arg3:string,arg4:any,arg5:number):Promise<models.Category>;
 
 export function UpdateCategoryDefaultAmount(arg1:number,arg2:number):Promise<void>;
-
-export function SetBankTransactionCategory(arg1:string,arg2:string,arg3:number):Promise<any>;

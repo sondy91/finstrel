@@ -150,7 +150,7 @@ func TestSyncRestartsWholePaginationAndReconcilesLifecycle(t *testing.T) {
 		}
 	})
 	r := record{Item: emptyItem("local-item", "Old bank name"), Cursor: "base"}
-	r.Item.Transactions = []Transaction{{ID: "pending", Amount: -10, Pending: true, BudgetCategoryID: 7}, {ID: "removed"}, {ID: "changed", Amount: -1, BudgetCategoryID: 8}}
+	r.Item.Transactions = []Transaction{{ID: "pending", Amount: -10, Pending: true, BudgetCategoryID: 7, ExcludeFromBudget: true}, {ID: "removed"}, {ID: "changed", Amount: -1, BudgetCategoryID: 8, ExcludeFromBudget: true}}
 	seed(t, s, r)
 	v, err := s.Import(context.Background())
 	if err != nil {
@@ -175,6 +175,9 @@ func TestSyncRestartsWholePaginationAndReconcilesLifecycle(t *testing.T) {
 		if (row.ID == "posted" && row.BudgetCategoryID != 7) || (row.ID == "changed" && row.BudgetCategoryID != 8) {
 			t.Fatalf("category lost during bank sync: %+v", row)
 		}
+		if (row.ID == "posted" || row.ID == "changed") && !row.ExcludeFromBudget {
+			t.Fatalf("exclusion lost during bank sync: %+v", row)
+		}
 		if row.Description != "Statement description" {
 			t.Error("nullable merchant fallback")
 		}
@@ -193,8 +196,12 @@ func TestTransactionCategoryPersistsInSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = s.SetTransactionExcluded("local-item", "purchase", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	view, err := s.View()
-	if err != nil || view.Items[0].Transactions[0].BudgetCategoryID != 7 {
+	if err != nil || view.Items[0].Transactions[0].BudgetCategoryID != 7 || !view.Items[0].Transactions[0].ExcludeFromBudget {
 		t.Fatalf("category not persisted: %+v %v", view, err)
 	}
 	if _, err := s.SetTransactionCategory("local-item", "missing", 7); err == nil {

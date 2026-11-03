@@ -37,15 +37,16 @@ type Account struct {
 }
 
 type Transaction struct {
-	ID               string  `json:"id"`
-	AccountID        string  `json:"accountId"`
-	Date             string  `json:"date"`
-	Description      string  `json:"description"`
-	Currency         string  `json:"currency"`
-	Category         string  `json:"category"`
-	BudgetCategoryID int64   `json:"budgetCategoryId,omitempty"`
-	Amount           float64 `json:"amount"` // Positive = inflow, matching the existing ledger.
-	Pending          bool    `json:"pending"`
+	ID                string  `json:"id"`
+	AccountID         string  `json:"accountId"`
+	Date              string  `json:"date"`
+	Description       string  `json:"description"`
+	Currency          string  `json:"currency"`
+	Category          string  `json:"category"`
+	BudgetCategoryID  int64   `json:"budgetCategoryId,omitempty"`
+	ExcludeFromBudget bool    `json:"excludeFromBudget,omitempty"`
+	Amount            float64 `json:"amount"` // Positive = inflow, matching the existing ledger.
+	Pending           bool    `json:"pending"`
 }
 
 type APR struct {
