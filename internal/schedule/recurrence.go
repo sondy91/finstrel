@@ -21,7 +21,7 @@ func (r Rule) Validate() error {
 		return fmt.Errorf("choose a valid first occurrence date")
 	}
 	switch r.Cadence {
-	case "once", "weekly", "biweekly", "monthly", "bimonthly":
+	case "once", "weekly", "biweekly", "threeweekly", "monthly", "bimonthly", "yearly":
 	case "semimonthly":
 		if r.SecondDay <= anchor.Day() || r.SecondDay > 31 {
 			return fmt.Errorf("second monthly day must be after the first day and at most 31")
@@ -66,19 +66,25 @@ func Dates(r Rule, from, to string) ([]string, error) {
 		switch r.Cadence {
 		case "once":
 			match = date == r.AnchorDate
-		case "weekly", "biweekly":
+		case "weekly", "biweekly", "threeweekly":
 			interval := 7
 			if r.Cadence == "biweekly" {
 				interval = 14
 			}
+			if r.Cadence == "threeweekly" {
+				interval = 21
+			}
 			match = int(day.Sub(anchor).Hours()/24)%interval == 0
-		case "monthly", "bimonthly", "semimonthly":
+		case "monthly", "bimonthly", "semimonthly", "yearly":
 			last := time.Date(day.Year(), day.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 			matchesDay := day.Day() == min(anchor.Day(), last)
 			months := (day.Year()-anchor.Year())*12 + int(day.Month()-anchor.Month())
 			match = matchesDay
 			if r.Cadence == "bimonthly" {
 				match = match && months%2 == 0
+			}
+			if r.Cadence == "yearly" {
+				match = match && months%12 == 0
 			}
 			if r.Cadence == "semimonthly" {
 				match = matchesDay || day.Day() == min(r.SecondDay, last)

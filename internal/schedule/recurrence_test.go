@@ -14,6 +14,8 @@ func TestCalendarRecurrences(t *testing.T) {
 	}{
 		{"weekly", Rule{Cadence: "weekly", AnchorDate: "2026-10-02"}, "2026-10-01", "2026-10-31", []string{"2026-10-02", "2026-10-09", "2026-10-16", "2026-10-23", "2026-10-30"}},
 		{"biweekly is not semi monthly", Rule{Cadence: "biweekly", AnchorDate: "2026-10-02"}, "2026-10-01", "2026-10-31", []string{"2026-10-02", "2026-10-16", "2026-10-30"}},
+		{"every three weeks", Rule{Cadence: "threeweekly", AnchorDate: "2026-10-02"}, "2026-10-01", "2026-11-30", []string{"2026-10-02", "2026-10-23", "2026-11-13"}},
+		{"yearly leap day", Rule{Cadence: "yearly", AnchorDate: "2024-02-29"}, "2025-01-01", "2028-12-31", []string{"2025-02-28", "2026-02-28", "2027-02-28", "2028-02-29"}},
 		{"semi monthly", Rule{Cadence: "semimonthly", AnchorDate: "2026-01-15", SecondDay: 31}, "2026-02-01", "2026-03-31", []string{"2026-02-15", "2026-02-28", "2026-03-15", "2026-03-31"}},
 		{"month end no drift", Rule{Cadence: "monthly", AnchorDate: "2024-01-31"}, "2024-02-01", "2024-04-30", []string{"2024-02-29", "2024-03-31", "2024-04-30"}},
 		{"finite plan", Rule{Cadence: "biweekly", AnchorDate: "2026-12-18", EndDate: "2027-01-15"}, "2026-12-01", "2027-02-28", []string{"2026-12-18", "2027-01-01", "2027-01-15"}},
