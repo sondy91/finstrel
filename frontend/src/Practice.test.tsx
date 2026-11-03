@@ -36,7 +36,7 @@ it('lets a new user practice review, close, start the next period, reset, and re
   await user.click(await screen.findByRole('button', { name: 'Review Previous two weeks' }));
   const review = await screen.findByRole('dialog');
   expect(await within(review).findByText('Spent')).toBeInTheDocument();
-  expect(review).toHaveTextContent('$283.00');
+  expect(review).toHaveTextContent('$318.00');
   await user.click(within(review).getByRole('button', { name: /Review bank transactions/ }));
   await user.click(await screen.findByRole('button', { name: 'View transaction Example dinner' }));
   await user.selectOptions(screen.getByLabelText('Budget category'), '3');
@@ -44,10 +44,23 @@ it('lets a new user practice review, close, start the next period, reset, and re
   await user.click(screen.getByRole('button', { name: 'Practice budgets' }));
   await user.click(await screen.findByRole('button', { name: 'Review Previous two weeks' }));
   const updatedReview = await screen.findByRole('dialog');
-  expect(updatedReview).toHaveTextContent('$307.00');
-  expect(within(updatedReview).getByRole('button', { name: 'Close budget' })).toBeDisabled();
-  await user.click(within(updatedReview).getByRole('checkbox'));
-  await user.click(within(updatedReview).getByRole('button', { name: 'Close budget' }));
+  expect(updatedReview).toHaveTextContent('$342.00');
+  await user.click(within(updatedReview).getByRole('button', { name: /Review bank transactions/ }));
+  await user.click(
+    await screen.findByRole('button', { name: 'View transaction Example grocery purchase' })
+  );
+  expect(screen.getByRole('region', { name: 'Possible duplicate transactions' })).toHaveTextContent(
+    'Example duplicate grocery entry'
+  );
+  await user.click(screen.getByRole('checkbox', { name: 'Include in budget' }));
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }));
+  await user.click(screen.getByRole('button', { name: 'Practice budgets' }));
+  await user.click(await screen.findByRole('button', { name: 'Review Previous two weeks' }));
+  const reconciledReview = await screen.findByRole('dialog');
+  expect(reconciledReview).toHaveTextContent('$307.00');
+  expect(within(reconciledReview).getByRole('button', { name: 'Close budget' })).toBeDisabled();
+  await user.click(within(reconciledReview).getByRole('checkbox'));
+  await user.click(within(reconciledReview).getByRole('button', { name: 'Close budget' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   await user.click(await screen.findByRole('button', { name: 'Start next period' }));
   const next = await screen.findByRole('dialog');

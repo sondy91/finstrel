@@ -39,8 +39,8 @@ export default function PracticePage({
       <section className="mx-auto max-w-7xl px-6 pt-6" aria-label="Practice guide">
         <h1 className="text-xl font-semibold">Try finishing a pay period</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Review “Previous two weeks” to see an example bank purchase in spending. Categorize the
-          example dinner, then review the budget again.
+          Review “Previous two weeks,” categorize the example dinner, and check the possible
+          duplicate grocery purchase.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           {session.hasPlaidData

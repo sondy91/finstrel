@@ -181,6 +181,17 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
   }));
   const transactions: Transaction[] = [
     {
+      id: 4,
+      date: day(-5),
+      amount: -35,
+      type: 'Expense',
+      description: 'Example duplicate grocery entry',
+      categoryId: 1,
+      accountId: 1,
+      notes: 'Example duplicate',
+      status: 'Cleared',
+    },
+    {
       id: 1,
       date: day(-10),
       amount: -86,

@@ -41,7 +41,7 @@ describe('practice household isolation', () => {
     const source = feeds('sandbox');
     const practice = createPracticeSession(source, new Date(2026, 9, 26, 12));
     const initial = await practice.call('GetBudgetReview', [1]);
-    expect(initial.spentByCategory[1]).toBe(121);
+    expect(initial.spentByCategory[1]).toBe(156);
     expect(initial.uncategorizedCount).toBe(2);
     await practice.call('SetBankTransactionCategory', [
       'practice-example-bank',

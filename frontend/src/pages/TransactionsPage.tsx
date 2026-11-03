@@ -24,6 +24,7 @@ import {
 import { models } from '../../wailsjs/go/models';
 import { dayLabel, errorText } from '@/lib/planning';
 import { onBankFeedsUpdated } from '@/lib/bankUpdates';
+import { findPossibleDuplicates } from '@/lib/duplicateSuggestions';
 import { bankMoney, supportsBankHistory, type TransactionFilter } from '@/lib/transactionBrowser';
 
 type Row = {
@@ -43,6 +44,9 @@ type Row = {
   itemId?: string;
   budgetCategoryId?: number;
   excludeFromBudget?: boolean;
+  disconnected?: boolean;
+  bankName?: string;
+  accountMask?: string;
 };
 const PAGE_SIZE = 25;
 
@@ -152,6 +156,9 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         itemId: item.id,
         budgetCategoryId: tx.budgetCategoryId || 0,
         excludeFromBudget: tx.excludeFromBudget || false,
+        disconnected: item.status === 'disconnected',
+        bankName: item.institution,
+        accountMask: account?.mask,
         account: account
           ? `${account.name}${account.mask ? ` · ••${account.mask}` : ''}`
           : 'Unavailable account',
@@ -181,6 +188,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
     source: 'manual',
   }));
   const sourceRows = source === 'connected' ? connectedRows : manualRows;
+  const possibleDuplicates = findPossibleDuplicates([...connectedRows, ...manualRows]);
   const accountOptions = new Map<string, string>();
   if (source === 'connected') {
     for (const item of allBankItems) {
@@ -403,6 +411,11 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
                               Pending
                             </span>
                           )}
+                          {!!possibleDuplicates.get(r.key)?.length && (
+                            <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs">
+                              Possible duplicate
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{r.category}</td>
                         <td className="px-4 py-3">
@@ -531,6 +544,23 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
                   </div>
                 ))}
               </dl>
+              {!!possibleDuplicates.get(selected.key)?.length && (
+                <section className="space-y-2" aria-label="Possible duplicate transactions">
+                  <h3 className="text-sm font-medium">Possible duplicate</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Same date and amount. Review before excluding either transaction.
+                  </p>
+                  {possibleDuplicates.get(selected.key)?.map((match) => (
+                    <button
+                      key={match.key}
+                      className="block text-left text-sm underline"
+                      onClick={() => setSelected(match)}
+                    >
+                      {match.description} · {match.institution} · {match.account}
+                    </button>
+                  ))}
+                </section>
+              )}
               {selected.source === 'connected' && (
                 <div className="space-y-2">
                   <Label htmlFor="bank-budget-category">Budget category</Label>

@@ -108,6 +108,15 @@ it('saves a budget category for a connected transaction', async () => {
   await user.selectOptions(screen.getByLabelText('Budget category'), '1');
   expect(api.SetBankTransactionCategory).toHaveBeenCalledWith('alpha', 'same-id', 1);
 });
+it('suggests an exact manual match and lets the user inspect it', async () => {
+  const user = userEvent.setup();
+  render(<TransactionsPage />);
+  await user.click(await screen.findByRole('button', { name: 'View transaction Grocery store' }));
+  const suggestions = screen.getByRole('region', { name: 'Possible duplicate transactions' });
+  await user.click(within(suggestions).getByRole('button', { name: /Manual grocery entry/ }));
+  expect(screen.getByRole('dialog')).toHaveTextContent('Manual ledger entry');
+  expect(api.SetBankTransactionExcluded).not.toHaveBeenCalled();
+});
 it('can exclude a bank transaction from budget totals', async () => {
   const user = userEvent.setup();
   vi.mocked(api.SetBankTransactionExcluded).mockResolvedValue({
