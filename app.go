@@ -177,11 +177,11 @@ func (a *App) AddCategoryWithDefault(name string, categoryType string, parentCat
 	if categoryType != "Income" && categoryType != "Expense" {
 		return models.Category{}, fmt.Errorf("invalid category type: %s", categoryType)
 	}
-	if name == "" {
+	if strings.TrimSpace(name) == "" {
 		return models.Category{}, fmt.Errorf("category name cannot be empty")
 	}
-	if defaultAmount < 0 {
-		return models.Category{}, fmt.Errorf("category default amount cannot be negative")
+	if defaultAmount < 0 || math.IsNaN(defaultAmount) || math.IsInf(defaultAmount, 0) {
+		return models.Category{}, fmt.Errorf("category default amount must be a finite non-negative amount")
 	}
 
 	newCategory := models.Category{
@@ -194,14 +194,16 @@ func (a *App) AddCategoryWithDefault(name string, categoryType string, parentCat
 	createdCategory, err := database.AddCategory(newCategory)
 	if err != nil {
 		log.Printf("Error calling database.AddCategory: %v", err)
-		// Consider checking for specific DB errors like UNIQUE constraint violation
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: categories.name") {
+			return models.Category{}, fmt.Errorf("a category with that name already exists")
+		}
 		return models.Category{}, fmt.Errorf("failed to add category: %w", err)
 	}
 	return createdCategory, nil
 }
 
 func (a *App) UpdateCategoryDefaultAmount(id int64, amount float64) error {
-	if id <= 0 || amount < 0 {
+	if id <= 0 || amount < 0 || math.IsNaN(amount) || math.IsInf(amount, 0) {
 		return fmt.Errorf("invalid category default amount")
 	}
 	if err := database.UpdateCategoryDefaultAmount(id, amount); err != nil {
@@ -211,7 +213,7 @@ func (a *App) UpdateCategoryDefaultAmount(id int64, amount float64) error {
 }
 
 func (a *App) UpdateCategory(id int64, name string, categoryType string, parentCategoryID *int64, defaultAmount float64) (models.Category, error) {
-	if id <= 0 || strings.TrimSpace(name) == "" || defaultAmount < 0 {
+	if id <= 0 || strings.TrimSpace(name) == "" || defaultAmount < 0 || math.IsNaN(defaultAmount) || math.IsInf(defaultAmount, 0) {
 		return models.Category{}, fmt.Errorf("invalid category details")
 	}
 	if categoryType != "Income" && categoryType != "Expense" {
@@ -222,6 +224,9 @@ func (a *App) UpdateCategory(id int64, name string, categoryType string, parentC
 	}
 	updated, err := database.UpdateCategory(models.Category{ID: id, Name: name, Type: categoryType, ParentCategoryID: parentCategoryID, DefaultAmount: defaultAmount})
 	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: categories.name") {
+			return models.Category{}, fmt.Errorf("a category with that name already exists")
+		}
 		return models.Category{}, fmt.Errorf("failed to update category: %w", err)
 	}
 	return updated, nil
@@ -273,6 +278,9 @@ func (a *App) AddTransaction(
 		dateString, amount, transactionType, description, categoryID, accountID, status)
 
 	// Validate Transaction Type
+	if math.IsNaN(amount) || math.IsInf(amount, 0) {
+		return models.Transaction{}, fmt.Errorf("transaction amount must be finite")
+	}
 	if transactionType != "Income" && transactionType != "Expense" {
 		return models.Transaction{}, fmt.Errorf("invalid transaction type: %s", transactionType)
 	}
@@ -600,9 +608,9 @@ func (a *App) AddBudgetAllocation(budgetPeriodID int64, categoryID int64, alloca
 	if budgetPeriodID <= 0 || categoryID <= 0 {
 		return models.BudgetAllocation{}, fmt.Errorf("invalid budget period ID or category ID")
 	}
-	if allocatedAmount < 0 {
+	if allocatedAmount < 0 || math.IsNaN(allocatedAmount) || math.IsInf(allocatedAmount, 0) {
 		// Or allow 0 if that makes sense for the application (e.g. zero-based budgeting placeholder)
-		return models.BudgetAllocation{}, fmt.Errorf("allocated amount cannot be negative")
+		return models.BudgetAllocation{}, fmt.Errorf("allocated amount must be finite and non-negative")
 	}
 
 	newAllocation := models.BudgetAllocation{
@@ -614,6 +622,9 @@ func (a *App) AddBudgetAllocation(budgetPeriodID int64, categoryID int64, alloca
 	createdAllocation, err := database.AddBudgetAllocation(newAllocation)
 	if err != nil {
 		log.Printf("Error calling database.AddBudgetAllocation: %v", err)
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: budget_allocations.budget_period_id, budget_allocations.category_id") {
+			return models.BudgetAllocation{}, fmt.Errorf("this category already has an envelope in this budget")
+		}
 		return models.BudgetAllocation{}, fmt.Errorf("failed to add budget allocation: %w", err)
 	}
 	return createdAllocation, nil
@@ -658,8 +669,8 @@ func (a *App) UpdateBudgetAllocation(id int64, allocatedAmount float64) (models.
 	if id <= 0 {
 		return models.BudgetAllocation{}, fmt.Errorf("invalid budget allocation ID")
 	}
-	if allocatedAmount < 0 {
-		return models.BudgetAllocation{}, fmt.Errorf("allocated amount cannot be negative")
+	if allocatedAmount < 0 || math.IsNaN(allocatedAmount) || math.IsInf(allocatedAmount, 0) {
+		return models.BudgetAllocation{}, fmt.Errorf("allocated amount must be finite and non-negative")
 	}
 
 	// To update, we technically only need ID and the fields to update.
