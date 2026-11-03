@@ -160,22 +160,28 @@ func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (mode
 		return result, nil
 	}
 	result.Environment = feeds.Environment
-	result.BankNotice = "Available imports may not cover this entire period. Bank and manual amounts are separate and may overlap."
+	result.BankNotice = "Available bank history may be incomplete. Manual entries and bank transactions may overlap."
 	for _, item := range feeds.Items {
 		for _, tx := range item.Transactions {
 			if tx.Date < start || tx.Date > end {
 				continue
 			}
 			result.ImportedCount++
-			if tx.BudgetCategoryID == 0 {
-				result.UncategorizedCount++
-			} else if tx.Currency == "USD" {
-				for _, category := range categories {
-					if category.ID == tx.BudgetCategoryID && category.Type == "Expense" {
+			if tx.Currency != "USD" {
+				result.UnsupportedCurrencyCount++
+			}
+			found := false
+			for _, category := range categories {
+				if category.ID == tx.BudgetCategoryID {
+					found = true
+					if category.Type == "Expense" && tx.Currency == "USD" {
 						result.SpentByCategory[category.ID] -= tx.Amount
-						break
 					}
+					break
 				}
+			}
+			if !found {
+				result.UncategorizedCount++
 			}
 			if tx.Pending {
 				result.ImportedPending++

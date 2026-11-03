@@ -7,6 +7,7 @@ import (
 	"finstrel/internal/models"
 	"fmt"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -378,7 +379,64 @@ func (a *App) UpdateCashFlowSettings(nextPaycheckDate string, desiredCashBuffer 
 }
 
 func (a *App) GetCashFlowSummary() (models.CashFlowSummary, error) {
-	return database.GetCashFlowSummary(time.Now())
+	return cashFlowSummary(time.Now(), a.GetBankFeedView)
+}
+
+func cashFlowSummary(now time.Time, readFeeds func() (bankfeed.View, error)) (models.CashFlowSummary, error) {
+	summary, err := database.GetCashFlowSummary(now)
+	if err != nil || summary.NextPaycheckDate == nil || summary.Status == "Payday overdue" {
+		return summary, err
+	}
+	periods, err := database.GetBudgetPeriods()
+	if err != nil {
+		return summary, err
+	}
+	today := now.Format("2006-01-02")
+	var active *models.BudgetPeriod
+	for i := range periods {
+		p := &periods[i]
+		if p.Status == "Open" && p.StartDate.Format("2006-01-02") <= today && p.EndDate.Format("2006-01-02") >= today && (active == nil || p.StartDate.After(active.StartDate) || (p.StartDate.Equal(active.StartDate) && p.ID > active.ID)) {
+			active = p
+		}
+	}
+	if active == nil {
+		return summary, nil
+	}
+	review, err := reviewBudget(active.ID, readFeeds)
+	if err != nil {
+		return summary, err
+	}
+	if strings.Contains(review.BankNotice, "could not be opened") {
+		return summary, fmt.Errorf("bank history unavailable; unable to calculate forecast")
+	}
+	allocations, err := database.GetBudgetAllocationsByBudgetPeriodID(active.ID)
+	if err != nil {
+		return summary, err
+	}
+	categories, err := database.GetCategories()
+	if err != nil {
+		return summary, err
+	}
+	remaining := 0.0
+	for _, allocation := range allocations {
+		for _, category := range categories {
+			if category.ID == allocation.CategoryID && category.Type == "Expense" {
+				remaining += math.Max(allocation.AllocatedAmount-review.SpentByCategory[category.ID], 0)
+			}
+		}
+	}
+	summary.FlexibleSpendingRemaining = remaining
+	summary.ProjectedBalance = summary.CashAvailable + summary.IncomeBeforeNextPaycheck - summary.UpcomingBills - remaining
+	summary.SafeToSpend = summary.ProjectedBalance - summary.DesiredCashBuffer
+	switch {
+	case summary.ProjectedBalance < 0:
+		summary.Status = "Shortfall"
+	case summary.SafeToSpend < 0:
+		summary.Status = "Tight"
+	default:
+		summary.Status = "On track"
+	}
+	return summary, nil
 }
 
 // AddBudgetPeriod adds a new budget period.

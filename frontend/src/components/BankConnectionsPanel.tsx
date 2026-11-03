@@ -474,8 +474,8 @@ const BankConnectionsPanel: React.FC<{
               Disconnect {disconnectItem?.institution || 'this institution'}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will revoke this app’s access and remove its locally imported bank data. Your
-              manually entered accounts and budget will remain.
+              This revokes access and deletes imported bank data. Those transactions will no longer
+              count in your budgets.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

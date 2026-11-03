@@ -24,18 +24,19 @@ type BudgetWindow struct {
 }
 
 type BudgetReview struct {
-	SpentByCategory     map[int64]float64   `json:"spentByCategory"`
-	UncategorizedCount  int                 `json:"uncategorizedCount"`
-	ManualCount         int                 `json:"manualCount"`
-	ManualPending       int                 `json:"manualPending"`
-	ManualExpenses      float64             `json:"manualExpenses"`
-	PlannedExpenses     float64             `json:"plannedExpenses"`
-	ImportedCount       int                 `json:"importedCount"`
-	ImportedPending     int                 `json:"importedPending"`
-	ImportedExpensesUSD float64             `json:"importedExpensesUSD"`
-	Environment         string              `json:"environment"`
-	BankNotice          string              `json:"bankNotice"`
-	Imported            []ReviewTransaction `json:"imported"`
+	SpentByCategory          map[int64]float64   `json:"spentByCategory"`
+	UncategorizedCount       int                 `json:"uncategorizedCount"`
+	UnsupportedCurrencyCount int                 `json:"unsupportedCurrencyCount"`
+	ManualCount              int                 `json:"manualCount"`
+	ManualPending            int                 `json:"manualPending"`
+	ManualExpenses           float64             `json:"manualExpenses"`
+	PlannedExpenses          float64             `json:"plannedExpenses"`
+	ImportedCount            int                 `json:"importedCount"`
+	ImportedPending          int                 `json:"importedPending"`
+	ImportedExpensesUSD      float64             `json:"importedExpensesUSD"`
+	Environment              string              `json:"environment"`
+	BankNotice               string              `json:"bankNotice"`
+	Imported                 []ReviewTransaction `json:"imported"`
 }
 type ReviewTransaction struct {
 	Date        string  `json:"date"`

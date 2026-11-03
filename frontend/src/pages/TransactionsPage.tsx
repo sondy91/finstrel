@@ -23,12 +23,7 @@ import {
 import { models } from '../../wailsjs/go/models';
 import { dayLabel, errorText } from '@/lib/planning';
 import { onBankFeedsUpdated } from '@/lib/bankUpdates';
-import {
-  bankMoney,
-  categoryLabel,
-  supportsBankHistory,
-  type TransactionFilter,
-} from '@/lib/transactionBrowser';
+import { bankMoney, supportsBankHistory, type TransactionFilter } from '@/lib/transactionBrowser';
 
 type Row = {
   key: string;
@@ -144,8 +139,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         id: tx.id,
         date: tx.date,
         description: tx.description,
-        category:
-          categories.find((c) => c.id === tx.budgetCategoryId)?.name || categoryLabel(tx.category),
+        category: categories.find((c) => c.id === tx.budgetCategoryId)?.name || 'Uncategorized',
         itemId: item.id,
         budgetCategoryId: tx.budgetCategoryId || 0,
         account: account
@@ -263,7 +257,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
         </div>
         <p className="text-xs text-muted-foreground">
           {source === 'connected'
-            ? `${feeds?.environment === 'sandbox' ? 'Test bank data · ' : ''}Imports aren’t included in budget totals yet.`
+            ? `${feeds?.environment === 'sandbox' ? 'Test bank data · ' : ''}Categorized USD transactions count toward budgets.`
             : 'Manual entries update your budget and balances.'}
         </p>
       </div>
@@ -592,7 +586,7 @@ export default function TransactionsPage({ initialFilter }: { initialFilter?: Tr
               {selected.source === 'connected' && (
                 <p className="text-xs text-muted-foreground">
                   {feeds?.environment === 'sandbox' ? 'Simulated bank data. ' : ''}
-                  Imported history is read-only and remains separate from manual budget totals.
+                  Categorized USD transactions count toward budgets.
                 </p>
               )}
             </div>

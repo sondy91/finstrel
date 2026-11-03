@@ -152,7 +152,7 @@ it('uses institution-safe account IDs and inclusive dates that can be cleared', 
   await user.type(screen.getByLabelText('Search'), 'Coffee');
   expect(within(table).queryByText('Grocery store')).not.toBeInTheDocument();
 });
-it('opens read-only details and focuses on that account', async () => {
+it('opens transaction details and focuses on that account', async () => {
   const user = userEvent.setup();
   render(<TransactionsPage />);
   await user.click(
@@ -163,7 +163,7 @@ it('opens read-only details and focuses on that account', async () => {
   const detail = screen.getByRole('dialog');
   expect(detail).toHaveTextContent('Beta Bank');
   expect(detail).toHaveTextContent('EUR');
-  expect(detail).toHaveTextContent('read-only');
+  expect(detail).toHaveTextContent('Categorized USD transactions count toward budgets');
   expect(within(detail).queryByRole('textbox')).not.toBeInTheDocument();
   await user.click(
     within(detail).getByRole('button', {
