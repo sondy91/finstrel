@@ -3,9 +3,16 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 import BudgetCloseoutPanel from './BudgetCloseoutPanel';
-import { GetBudgetReview, UpdateBudgetPeriodStatus } from '@/wailsAdapter';
+import {
+  GetBudgetReview,
+  GetBudgetAllocationsByBudgetPeriodID,
+  GetCategories,
+  UpdateBudgetPeriodStatus,
+} from '@/wailsAdapter';
 vi.mock('@/wailsAdapter', () => ({
   GetBudgetReview: vi.fn(),
+  GetBudgetAllocationsByBudgetPeriodID: vi.fn(),
+  GetCategories: vi.fn(),
   UpdateBudgetPeriodStatus: vi.fn(),
 }));
 const old = new models.BudgetPeriod({
@@ -31,6 +38,12 @@ beforeEach(() => {
     bankNotice: 'History may be incomplete.',
     imported: [],
   });
+  vi.mocked(GetBudgetAllocationsByBudgetPeriodID).mockResolvedValue([
+    { categoryId: 1, allocatedAmount: 100 },
+  ]);
+  vi.mocked(GetCategories).mockResolvedValue([
+    { id: 1, name: 'Groceries', type: 'Expense', defaultAmount: 80 },
+  ]);
   vi.mocked(UpdateBudgetPeriodStatus).mockResolvedValue(undefined);
 });
 it('queues only ended open budgets, requiring review before closing without posting spending', async () => {
@@ -65,6 +78,11 @@ it('queues only ended open budgets, requiring review before closing without post
   await screen.findByText('Test bank data');
   expect(screen.getByRole('region', { name: 'Expense summary' })).toHaveTextContent('$55.00');
   expect(screen.getByText('2 uncategorized')).toBeInTheDocument();
+  const envelope = screen.getByRole('row', { name: /Groceries/ });
+  expect(envelope).toHaveTextContent('$100.00');
+  expect(envelope).toHaveTextContent('$55.00');
+  expect(envelope).toHaveTextContent('$45.00');
+  expect(envelope).toHaveTextContent('$80.00');
   expect(screen.queryByRole('button', { name: /review future/i })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /review closed/i })).not.toBeInTheDocument();
   const close = screen.getByRole('button', {

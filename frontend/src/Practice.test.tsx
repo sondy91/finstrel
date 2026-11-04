@@ -35,7 +35,9 @@ it('lets a new user practice review, close, start the next period, reset, and re
   ).toBeInTheDocument();
   await user.click(await screen.findByRole('button', { name: 'Review Previous two weeks' }));
   const review = await screen.findByRole('dialog');
-  expect(await within(review).findByText('Spent')).toBeInTheDocument();
+  expect(await within(review).findByRole('region', { name: 'Expense summary' })).toHaveTextContent(
+    'Spent'
+  );
   expect(review).toHaveTextContent('$318.00');
   await user.click(within(review).getByRole('button', { name: /Review bank transactions/ }));
   await user.click(await screen.findByRole('button', { name: 'View transaction Example dinner' }));

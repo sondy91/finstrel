@@ -8,7 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { GetBudgetReview, UpdateBudgetPeriodStatus } from '@/wailsAdapter';
+import {
+  GetBudgetReview,
+  GetBudgetAllocationsByBudgetPeriodID,
+  GetCategories,
+  UpdateBudgetPeriodStatus,
+} from '@/wailsAdapter';
 import { dayLabel, errorText, todayKey } from '@/lib/planning';
 import { bankMoney, type TransactionFilter } from '@/lib/transactionBrowser';
 import { models } from '../../wailsjs/go/models';
@@ -58,19 +63,50 @@ export default function BudgetCloseoutPanel({
   const [reviewId, setReviewId] = useState<number | null>(null);
   const reviewPeriod = queue.find((p) => p.id === reviewId);
   const [review, setReview] = useState<Review | null>(null);
+  const [envelopes, setEnvelopes] = useState<
+    { id: number; name: string; planned: number; next: number }[]
+  >([]);
   const [error, setError] = useState('');
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
     setReview(null);
+    setEnvelopes([]);
     setChecked(false);
     setError('');
     if (reviewPeriod)
-      GetBudgetReview(reviewPeriod.id)
-        .then((v: Review) => {
-          if (active) setReview(v);
-        })
+      Promise.all([
+        GetBudgetReview(reviewPeriod.id),
+        GetBudgetAllocationsByBudgetPeriodID(reviewPeriod.id),
+        GetCategories(),
+      ])
+        .then(
+          ([v, allocations, categories]: [
+            Review,
+            models.BudgetAllocation[],
+            models.Category[],
+          ]) => {
+            if (!active) return;
+            const categoryMap = new Map(
+              (categories || []).filter((c) => c.type === 'Expense').map((c) => [c.id, c])
+            );
+            const amounts = new Map(
+              (allocations || []).map((a) => [a.categoryId, a.allocatedAmount])
+            );
+            setEnvelopes(
+              [...categoryMap.values()]
+                .filter((c) => amounts.has(c.id) || (v.spentByCategory?.[c.id] || 0) !== 0)
+                .map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  planned: amounts.get(c.id) || 0,
+                  next: c.defaultAmount || 0,
+                }))
+            );
+            setReview(v);
+          }
+        )
         .catch((e: unknown) => {
           if (active) setError(errorText(e));
         });
@@ -181,6 +217,43 @@ export default function BudgetCloseoutPanel({
                   Categorized USD transactions count toward spending.
                 </p>
               </section>
+              {envelopes.length > 0 && (
+                <section aria-label="Envelope review" className="space-y-3">
+                  <h3 className="text-sm font-semibold">Envelopes</h3>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-left text-sm">
+                      <thead className="text-xs text-muted-foreground">
+                        <tr>
+                          <th className="p-3">Category</th>
+                          <th className="p-3">Planned</th>
+                          <th className="p-3">Spent</th>
+                          <th className="p-3">Carry</th>
+                          <th className="p-3">Next contribution</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {envelopes.map((envelope) => {
+                          const spending = review.spentByCategory?.[envelope.id] || 0;
+                          const carry = envelope.planned - spending;
+                          return (
+                            <tr key={envelope.id} className="border-t">
+                              <th scope="row" className="p-3 font-medium">
+                                {envelope.name}
+                              </th>
+                              <td className="p-3">{bankMoney(envelope.planned, 'USD')}</td>
+                              <td className="p-3">{bankMoney(spending, 'USD')}</td>
+                              <td className={`p-3 ${carry < 0 ? 'text-destructive' : ''}`}>
+                                {bankMoney(carry, 'USD')}
+                              </td>
+                              <td className="p-3">{bankMoney(envelope.next, 'USD')}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               <section className="space-y-3" aria-label="Bank history">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
