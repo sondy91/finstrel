@@ -62,12 +62,14 @@ it('lets a new user practice review, close, start the next period, reset, and re
   expect(reconciledReview).toHaveTextContent('$307.00');
   expect(within(reconciledReview).getByRole('button', { name: 'Close budget' })).toBeDisabled();
   await user.click(within(reconciledReview).getByRole('checkbox'));
-  await user.click(within(reconciledReview).getByRole('button', { name: 'Close budget' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  await user.click(await screen.findByRole('button', { name: 'Start next period' }));
+  await user.click(
+    within(reconciledReview).getByRole('button', { name: 'Close and start next period' })
+  );
   const next = await screen.findByRole('dialog');
   await user.type(within(next).getByLabelText('New period name'), 'Our next two weeks');
-  await user.click(await within(next).findByRole('button', { name: 'Create next period' }));
+  await user.click(
+    await within(next).findByRole('button', { name: 'Close current and start next period' })
+  );
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(await screen.findByText('Envelopes for: Our next two weeks')).toBeInTheDocument();
   const groceries = screen.getByText('Groceries').closest('tr');

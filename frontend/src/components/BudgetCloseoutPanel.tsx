@@ -47,6 +47,7 @@ export default function BudgetCloseoutPanel({
   selected,
   onSelect,
   onClosed,
+  onStartNext,
   revision = 0,
   onBrowseTransactions,
 }: {
@@ -54,6 +55,7 @@ export default function BudgetCloseoutPanel({
   selected: models.BudgetPeriod | null;
   onSelect: (p: models.BudgetPeriod) => void;
   onClosed: () => void;
+  onStartNext?: (p: models.BudgetPeriod) => void;
   revision?: number;
   onBrowseTransactions?: (filter: TransactionFilter) => void;
 }) {
@@ -324,10 +326,28 @@ export default function BudgetCloseoutPanel({
                   />
                   I’ve checked this period.
                 </label>
-                <Button disabled={!checked || busy} onClick={() => void close()}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  {busy ? 'Closing…' : 'Close budget'}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={onStartNext ? 'outline' : 'default'}
+                    disabled={!checked || busy}
+                    onClick={() => void close()}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {busy ? 'Closing…' : 'Close budget'}
+                  </Button>
+                  {onStartNext && (
+                    <Button
+                      disabled={!checked || busy}
+                      onClick={() => {
+                        if (!reviewPeriod) return;
+                        setReviewId(null);
+                        onStartNext(reviewPeriod);
+                      }}
+                    >
+                      Close and start next period
+                    </Button>
+                  )}
+                </div>
               </footer>
             </div>
           )}

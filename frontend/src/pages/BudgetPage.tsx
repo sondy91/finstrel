@@ -95,6 +95,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
   const [showAddAllocationForm, setShowAddAllocationForm] = useState<boolean>(false);
   const [isCreatePeriodOpen, setIsCreatePeriodOpen] = useState<boolean>(false);
   const [isHandoffOpen, setIsHandoffOpen] = useState<boolean>(false);
+  const [handoffSource, setHandoffSource] = useState<models.BudgetPeriod | null>(null);
   const [nextPeriodName, setNextPeriodName] = useState('');
   const [nextPeriodStart, setNextPeriodStart] = useState('');
   const [nextPeriodEnd, setNextPeriodEnd] = useState('');
@@ -158,16 +159,17 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
     setIsCreatePeriodOpen(false);
   };
 
-  const openHandoff = () => {
-    if (!selectedPeriod) return;
-    const currentEnd = new Date(String(selectedPeriod.endDate).slice(0, 10) + 'T12:00:00');
+  const openHandoff = (source: models.BudgetPeriod | null) => {
+    if (!source) return;
+    setHandoffSource(source);
+    const currentEnd = new Date(String(source.endDate).slice(0, 10) + 'T12:00:00');
     const start = new Date(currentEnd);
     start.setDate(start.getDate() + 1);
     const durationDays = Math.max(
       1,
       Math.round(
         (currentEnd.getTime() -
-          new Date(String(selectedPeriod.startDate).slice(0, 10) + 'T12:00:00').getTime()) /
+          new Date(String(source.startDate).slice(0, 10) + 'T12:00:00').getTime()) /
           86400000
       )
     );
@@ -185,12 +187,12 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
   };
 
   const completeHandoff = async () => {
-    if (!selectedPeriod) return;
+    if (!handoffSource) return;
     setHandoffError(null);
     setIsHandingOff(true);
     try {
       const next = await StartNextBudget(
-        selectedPeriod.id,
+        handoffSource.id,
         nextPeriodName,
         nextPeriodStart,
         nextPeriodEnd
@@ -444,6 +446,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
         selected={selectedPeriod}
         onSelect={handlePeriodSelect}
         onClosed={() => void fetchBudgetPeriods()}
+        onStartNext={openHandoff}
       />
 
       {/* Carousel of Budget Periods */}
@@ -504,7 +507,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
                     </Button>
                   )}
                   {['Open', 'Closed'].includes(selectedPeriod.status) && (
-                    <Button variant="outline" onClick={openHandoff} size="sm">
+                    <Button variant="outline" onClick={() => openHandoff(selectedPeriod)} size="sm">
                       Start next period
                     </Button>
                   )}
@@ -744,15 +747,15 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedPeriod?.status === 'Closed'
+              {handoffSource?.status === 'Closed'
                 ? 'Start next period'
                 : 'Close and start next period'}
             </DialogTitle>
           </DialogHeader>
           <DialogDescription>
-            {selectedPeriod?.status === 'Closed'
+            {handoffSource?.status === 'Closed'
               ? 'The next period includes your category defaults and carried balances.'
-              : `This closes ${selectedPeriod?.name} and carries remaining balances into the next period.`}
+              : `This closes ${handoffSource?.name} and carries remaining balances into the next period.`}
           </DialogDescription>
           {handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
           <div className="space-y-4">
