@@ -995,7 +995,10 @@ func UpdateBudgetAllocation(alloc models.BudgetAllocation) (models.BudgetAllocat
 // DeleteBudgetAllocation deletes a budget allocation by its ID.
 func DeleteBudgetAllocation(id int64) error {
 	db := GetDB()
-	stmt, err := db.Prepare("DELETE FROM budget_allocations WHERE id = ?")
+	stmt, err := db.Prepare(`DELETE FROM budget_allocations WHERE id = ? AND NOT EXISTS (
+		SELECT 1 FROM budget_handoffs h JOIN budget_carry_entries e ON e.handoff_id=h.id
+		WHERE h.target_period_id=budget_allocations.budget_period_id AND e.category_id=budget_allocations.category_id
+		GROUP BY e.category_id HAVING ABS(SUM(e.amount)) >= 0.005)`)
 	if err != nil {
 		log.Printf("Error preparing delete budget allocation statement: %v", err)
 		return err
@@ -1014,8 +1017,13 @@ func DeleteBudgetAllocation(id int64) error {
 		// Not returning error here as the delete might have still worked
 	}
 	if rowsAffected == 0 {
-		log.Printf("No budget allocation found with ID %d to delete.", id)
-		// Optionally return sql.ErrNoRows or a custom error
+		var exists int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM budget_allocations WHERE id=?`, id).Scan(&exists); err != nil {
+			return err
+		}
+		if exists > 0 {
+			return fmt.Errorf("this envelope contains a carried balance; update the previous budget before removing it")
+		}
 	}
 
 	log.Printf("Budget allocation ID %d deleted successfully (or did not exist).", id)
@@ -1240,6 +1248,8 @@ func ClearAllData() error {
 
 	// Delete in order to respect foreign key constraints
 	tables := []string{
+		"budget_carry_entries",
+		"budget_handoffs",
 		"budget_allocations",
 		"bill_recurrences",
 		"income_schedules",

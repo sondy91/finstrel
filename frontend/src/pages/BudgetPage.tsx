@@ -1,5 +1,6 @@
 import { type TransactionFilter } from '@/lib/transactionBrowser';
 import { onBankFeedsUpdated } from '@/lib/bankUpdates';
+import { errorText } from '@/lib/planning';
 import BudgetDateFields from '@/components/BudgetDateFields';
 import BudgetCloseoutPanel from '@/components/BudgetCloseoutPanel';
 import {
@@ -44,13 +45,14 @@ import {
   DeleteBudgetAllocation,
   GetBudgetAllocationsByBudgetPeriodID,
   GetBudgetPeriods,
-  AddBudgetPeriod,
   GetCategories,
   GetBudgetReview,
   UpdateBudgetAllocation,
   UpdateBudgetPeriod,
   PopulateBudgetPeriodFromDefaults,
-  CloseAndCreateBudgetPeriod,
+  StartNextBudget,
+  GetCarryStatus,
+  ReconcileBudgetCarry,
   UpdateBudgetPeriodStatus,
 } from '../wailsAdapter';
 
@@ -75,6 +77,16 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
   } | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [activityWarnings, setActivityWarnings] = useState<string[]>([]);
+  const [carry, setCarry] = useState<{
+    sourceId: number;
+    sourceName: string;
+    sourceStatus: string;
+    amounts: Record<number, number>;
+    changes: Record<number, number>;
+    reviewError: string;
+  } | null>(null);
+  const [carryError, setCarryError] = useState('');
+  const [reconciling, setReconciling] = useState(false);
 
   const [categories, setCategories] = useState<models.Category[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
@@ -177,20 +189,17 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
     setHandoffError(null);
     setIsHandingOff(true);
     try {
-      const next =
-        selectedPeriod.status === 'Closed'
-          ? await AddBudgetPeriod(nextPeriodName, nextPeriodStart, nextPeriodEnd, 'Open')
-          : await CloseAndCreateBudgetPeriod(
-              selectedPeriod.id,
-              nextPeriodName,
-              nextPeriodStart,
-              nextPeriodEnd
-            );
+      const next = await StartNextBudget(
+        selectedPeriod.id,
+        nextPeriodName,
+        nextPeriodStart,
+        nextPeriodEnd
+      );
       await fetchBudgetPeriods();
       setSelectedPeriod(next);
       setIsHandoffOpen(false);
-    } catch (err: any) {
-      setHandoffError(err.message || 'Unable to start the next period');
+    } catch (err: unknown) {
+      setHandoffError(errorText(err));
     } finally {
       setIsHandingOff(false);
     }
@@ -238,10 +247,16 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
       setActivity(null);
       setActivityError(null);
       setActivityWarnings([]);
+      setCarry(null);
+      setCarryError('');
       try {
-        const review = await GetBudgetReview(selectedPeriod.id);
+        const [review, carryStatus] = await Promise.all([
+          GetBudgetReview(selectedPeriod.id),
+          GetCarryStatus(selectedPeriod.id),
+        ]);
         if (!active || request !== version) return;
         if (review.bankNotice?.includes('could not be opened')) throw new Error(review.bankNotice);
+        setCarry(carryStatus || null);
         setActivity({
           spentByCategory: review.spentByCategory || {},
           incomeByCategory: review.incomeByCategory || {},
@@ -270,6 +285,20 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
       unsubscribe();
     };
   }, [selectedPeriod?.id, selectedPeriod?.startDate, selectedPeriod?.endDate, closeoutRevision]);
+
+  const reconcile = async () => {
+    if (!selectedPeriod || reconciling) return;
+    setReconciling(true);
+    setCarryError('');
+    try {
+      await ReconcileBudgetCarry(selectedPeriod.id);
+      await fetchAllocationsForSelectedPeriod();
+    } catch (error) {
+      setCarryError(errorText(error));
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   const handleAllocationModified = () => {
     setShowAddAllocationForm(false);
@@ -490,6 +519,51 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
               )}
             </CardHeader>
             <CardContent>
+              {carry && (
+                <div className="mb-4 space-y-2 text-sm">
+                  <p>Carried from {carry.sourceName}. Budgeted amounts include carried balances.</p>
+                  {carry.reviewError && (
+                    <p role="alert" className="text-destructive">
+                      {carry.reviewError}
+                    </p>
+                  )}
+                  {Object.keys(carry.changes || {}).length > 0 && (
+                    <div className="rounded border p-3">
+                      <p>Changes to {carry.sourceName} affect these balances:</p>
+                      <ul className="mt-2 space-y-1">
+                        {Object.entries(carry.changes).map(([id, amount]) => (
+                          <li key={id}>
+                            {getCategoryName(Number(id))}: {money(amount)}
+                          </li>
+                        ))}
+                      </ul>
+                      <Button
+                        className="mt-3"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void reconcile()}
+                        disabled={
+                          reconciling ||
+                          carry.sourceStatus !== 'Closed' ||
+                          selectedPeriod.status !== 'Open'
+                        }
+                      >
+                        Update carried balances
+                      </Button>
+                      {(carry.sourceStatus !== 'Closed' || selectedPeriod.status !== 'Open') && (
+                        <p className="mt-2 text-muted-foreground">
+                          Close the previous budget and reopen this one to update balances.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {carryError && (
+                    <p role="alert" className="text-destructive">
+                      {carryError}
+                    </p>
+                  )}
+                </div>
+              )}
               {isLoadingAllocations && (
                 <p className="text-muted-foreground">Loading envelopes...</p>
               )}
@@ -536,6 +610,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
                         <TableRow>
                           <TableHead>Category</TableHead>
                           <TableHead>Budgeted Amount</TableHead>
+                          <TableHead>Carried</TableHead>
                           <TableHead>Activity</TableHead>
                           <TableHead>Remaining</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
@@ -548,7 +623,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
                             allocationType(displayAllocations[index - 1]) !==
                               allocationType(alloc) ? (
                               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                                <TableCell colSpan={5} className="font-semibold">
+                                <TableCell colSpan={6} className="font-semibold">
                                   {allocationType(alloc) === 'Income'
                                     ? 'Planned Income'
                                     : 'Expense Envelopes'}
@@ -596,6 +671,11 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
                                     <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 )}
+                              </TableCell>
+                              <TableCell>
+                                {allocationType(alloc) === 'Expense'
+                                  ? money(carry?.amounts?.[alloc.categoryId] || 0)
+                                  : '—'}
                               </TableCell>
                               <TableCell>
                                 {activity
@@ -671,8 +751,8 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
           </DialogHeader>
           <DialogDescription>
             {selectedPeriod?.status === 'Closed'
-              ? 'Your reviewed budget stays closed. The next period starts from your category defaults.'
-              : `This closes ${selectedPeriod?.name} and creates an editable new period from your category defaults.`}
+              ? 'The next period includes your category defaults and carried balances.'
+              : `This closes ${selectedPeriod?.name} and carries remaining balances into the next period.`}
           </DialogDescription>
           {handoffError && <p className="text-sm text-destructive">{handoffError}</p>}
           <div className="space-y-4">

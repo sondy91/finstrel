@@ -68,6 +68,9 @@ it('lets a new user practice review, close, start the next period, reset, and re
   await user.click(await within(next).findByRole('button', { name: 'Create next period' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(await screen.findByText('Envelopes for: Our next two weeks')).toBeInTheDocument();
+  const groceries = screen.getByText('Groceries').closest('tr');
+  expect(groceries).toHaveTextContent('$579.00');
+  expect(groceries).toHaveTextContent('$229.00');
   expect(localStorage.getItem('vestra-onboarding-complete')).toBeNull();
   expect(localStorage.getItem('vestra-budget-seeded')).toBeNull();
   expect(native.mock.calls.map(([name]) => name)).toEqual([

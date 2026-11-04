@@ -23,6 +23,15 @@ type BudgetWindow struct {
 	End   string `json:"end"`
 }
 
+type CarryStatus struct {
+	SourceID     int64             `json:"sourceId"`
+	SourceName   string            `json:"sourceName"`
+	SourceStatus string            `json:"sourceStatus"`
+	Amounts      map[int64]float64 `json:"amounts"`
+	Changes      map[int64]float64 `json:"changes"`
+	ReviewError  string            `json:"reviewError"`
+}
+
 type BudgetReview struct {
 	ExpectedScheduledIncome  float64             `json:"expectedScheduledIncome"`
 	ActiveIncomeSchedules    int                 `json:"activeIncomeSchedules"`

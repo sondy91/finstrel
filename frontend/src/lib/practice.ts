@@ -173,6 +173,7 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
   const periods: Period[] = [
     { id: 1, name: 'Previous two weeks', startDate: day(-14), endDate: day(-1), status: 'Open' },
   ];
+  const handoffs: { sourceId: number; targetId: number; amounts: Record<number, number> }[] = [];
   const allocations: Allocation[] = categories.map((c) => ({
     id: nextId++,
     budgetPeriodId: 1,
@@ -292,6 +293,8 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       incomeByCategory,
       uncategorizedCount: imported.filter((t) => !t.budgetCategoryId && !t.excludeFromBudget)
         .length,
+      unsupportedCurrencyCount: imported.filter((t) => t.currency !== 'USD' && !t.excludeFromBudget)
+        .length,
       manualExpenses: manual
         .filter((t) => t.type === 'Expense')
         .reduce((sum, t) => sum + Math.abs(t.amount), 0),
@@ -311,6 +314,54 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       environment: 'sandbox',
       bankNotice:
         'Practice manual entries are fictional. Plaid test dates are shifted for practice.',
+    };
+  };
+  const carryBalances = (id: number) => {
+    const reviewed = review(id);
+    if (reviewed.uncategorizedCount || reviewed.unsupportedCurrencyCount)
+      throw new Error(
+        'Categorize or exclude unbudgeted bank transactions before carrying balances.'
+      );
+    return Object.fromEntries(
+      categories
+        .filter((c) => c.type === 'Expense')
+        .map((c) => {
+          const allocation = allocations.find(
+            (a) => a.budgetPeriodId === id && a.categoryId === c.id
+          );
+          return [
+            c.id,
+            Math.round(
+              ((allocation?.allocatedAmount || 0) - (reviewed.spentByCategory[c.id] || 0)) * 100
+            ) / 100,
+          ];
+        })
+    ) as Record<number, number>;
+  };
+  const carryStatus = (targetId: number) => {
+    const handoff = handoffs.find((h) => h.targetId === targetId);
+    if (!handoff) return null;
+    const source = period(handoff.sourceId);
+    let changes: Record<number, number> = {};
+    let reviewError = '';
+    try {
+      const expected = carryBalances(source.id);
+      for (const id of new Set([...Object.keys(expected), ...Object.keys(handoff.amounts)])) {
+        const delta =
+          Math.round(((expected[Number(id)] || 0) - (handoff.amounts[Number(id)] || 0)) * 100) /
+          100;
+        if (delta) changes[Number(id)] = delta;
+      }
+    } catch (error) {
+      reviewError = error instanceof Error ? error.message : String(error);
+    }
+    return {
+      sourceId: source.id,
+      sourceName: source.name,
+      sourceStatus: source.status,
+      amounts: handoff.amounts,
+      changes,
+      reviewError,
     };
   };
   const preview = (start: string, cadence: string) => {
@@ -345,6 +396,60 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
     GetBudgetAllocationsByBudgetPeriodID: (id: number) =>
       allocations.filter((a) => a.budgetPeriodId === id),
     GetBudgetReview: review,
+    GetCarryStatus: carryStatus,
+    StartNextBudget: (id: number, name: string, start: string, end: string) => {
+      const source = period(id);
+      if (!['Open', 'Closed'].includes(source.status) || handoffs.some((h) => h.sourceId === id))
+        throw new Error('This budget already has a next period.');
+      if (
+        start <= source.endDate.slice(0, 10) ||
+        periods.some((p) => p.startDate.slice(0, 10) <= end && p.endDate.slice(0, 10) >= start)
+      )
+        throw new Error('Next budget overlaps an existing period.');
+      const previous = carryStatus(id);
+      if (
+        previous &&
+        (previous.sourceStatus !== 'Closed' ||
+          previous.reviewError ||
+          Object.keys(previous.changes).length)
+      )
+        throw new Error("Resolve the previous budget's carry-forward first.");
+      const amounts = carryBalances(id);
+      const next = addPeriod(name, start, end);
+      for (const [categoryId, amount] of Object.entries(amounts)) {
+        const allocation = allocations.find(
+          (a) => a.budgetPeriodId === next.id && a.categoryId === Number(categoryId)
+        );
+        if (allocation) allocation.allocatedAmount += amount;
+      }
+      source.status = 'Closed';
+      handoffs.push({ sourceId: id, targetId: next.id, amounts });
+      return next;
+    },
+    ReconcileBudgetCarry: (targetId: number) => {
+      const status = carryStatus(targetId);
+      if (!status) throw new Error('No carry-forward found.');
+      if (status.reviewError) throw new Error(status.reviewError);
+      if (status.sourceStatus !== 'Closed' || period(targetId).status !== 'Open')
+        throw new Error('Close the previous budget and reopen this one.');
+      const handoff = handoffs.find((h) => h.targetId === targetId)!;
+      for (const [id, delta] of Object.entries(status.changes)) {
+        let allocation = allocations.find(
+          (a) => a.budgetPeriodId === targetId && a.categoryId === Number(id)
+        );
+        if (!allocation) {
+          allocation = {
+            id: nextId++,
+            budgetPeriodId: targetId,
+            categoryId: Number(id),
+            allocatedAmount: 0,
+          };
+          allocations.push(allocation);
+        }
+        allocation.allocatedAmount += delta;
+        handoff.amounts[Number(id)] = (handoff.amounts[Number(id)] || 0) + delta;
+      }
+    },
     PreviewBudgetWindow: preview,
     SetBankTransactionCategory: (itemId: string, transactionId: string, categoryId: number) => {
       const transaction = feeds.items
@@ -397,7 +502,13 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
     },
     DeleteBudgetAllocation: (id: number) => {
       const i = allocations.findIndex((a) => a.id === id);
-      if (i >= 0) allocations.splice(i, 1);
+      if (i >= 0) {
+        const a = allocations[i];
+        const handoff = handoffs.find((h) => h.targetId === a.budgetPeriodId);
+        if (handoff?.amounts[a.categoryId])
+          throw new Error('Cannot delete an envelope with a carried balance.');
+        allocations.splice(i, 1);
+      }
     },
     AddCategoryWithDefault: (
       name: string,

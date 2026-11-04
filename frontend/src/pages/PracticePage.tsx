@@ -47,7 +47,7 @@ export default function PracticePage({
           {session.hasPlaidData
             ? 'Your Plaid Sandbox history is copied with dates shifted for practice.'
             : 'Example bank data is included.'}{' '}
-          Changes stay in practice. Category defaults carry forward; past spending does not.
+          Changes stay in practice. Unspent and overspent balances carry forward.
         </p>
         <nav aria-label="Practice views" className="mt-4 flex gap-2 border-b pb-3">
           <Button

@@ -3,11 +3,11 @@ package database
 import (
 	"database/sql"
 	"encoding/json"
+	"finstrel/internal/models"
+	"finstrel/internal/schedule"
 	"fmt"
 	"sort"
 	"time"
-	"finstrel/internal/models"
-	"finstrel/internal/schedule"
 )
 
 // Additive only: old bill rows, IDs, due days and amounts are preserved. Older
@@ -16,6 +16,8 @@ func createPlanningTables(tx *sql.Tx) error {
 	for _, q := range []string{
 		`CREATE TABLE IF NOT EXISTS bill_recurrences (bill_id INTEGER PRIMARY KEY REFERENCES bills(id) ON DELETE CASCADE, rule TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS income_schedules (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, amount REAL NOT NULL CHECK(amount>=0), active INTEGER NOT NULL DEFAULT 1, rule TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS budget_handoffs (id INTEGER PRIMARY KEY AUTOINCREMENT, source_period_id INTEGER NOT NULL UNIQUE REFERENCES budget_periods(id), target_period_id INTEGER NOT NULL UNIQUE REFERENCES budget_periods(id), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+		`CREATE TABLE IF NOT EXISTS budget_carry_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, handoff_id INTEGER NOT NULL REFERENCES budget_handoffs(id), category_id INTEGER NOT NULL REFERENCES categories(id), amount REAL NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
 	} {
 		if _, err := tx.Exec(q); err != nil {
 			return err

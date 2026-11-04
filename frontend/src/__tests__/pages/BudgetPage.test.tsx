@@ -7,6 +7,9 @@ import * as Adapter from '../../wailsAdapter';
 vi.mock('../../wailsAdapter', () => ({
   GetBudgetPeriods: vi.fn(),
   GetBudgetReview: vi.fn(),
+  GetCarryStatus: vi.fn(),
+  StartNextBudget: vi.fn(),
+  ReconcileBudgetCarry: vi.fn(),
   GetBudgetAllocationsByBudgetPeriodID: vi.fn(),
   GetCategories: vi.fn(),
   DeleteBudgetAllocation: vi.fn(),
@@ -49,6 +52,7 @@ describe('BudgetPage', () => {
     (Adapter.GetBudgetAllocationsByBudgetPeriodID as unknown as Mock).mockResolvedValue(
       mockAllocations as any
     );
+    (Adapter.GetCarryStatus as unknown as Mock).mockResolvedValue(null);
 
     (Adapter.GetBudgetReview as unknown as Mock).mockResolvedValue({
       manualCount: 0,
