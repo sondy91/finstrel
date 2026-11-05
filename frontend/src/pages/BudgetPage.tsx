@@ -1,6 +1,6 @@
 import { type TransactionFilter } from '@/lib/transactionBrowser';
 import { onBankFeedsUpdated } from '@/lib/bankUpdates';
-import { errorText } from '@/lib/planning';
+import { errorText, nextBudgetDates } from '@/lib/planning';
 import BudgetDateFields from '@/components/BudgetDateFields';
 import BudgetCloseoutPanel from '@/components/BudgetCloseoutPanel';
 import {
@@ -162,26 +162,10 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
   const openHandoff = (source: models.BudgetPeriod | null) => {
     if (!source) return;
     setHandoffSource(source);
-    const currentEnd = new Date(String(source.endDate).slice(0, 10) + 'T12:00:00');
-    const start = new Date(currentEnd);
-    start.setDate(start.getDate() + 1);
-    const durationDays = Math.max(
-      1,
-      Math.round(
-        (currentEnd.getTime() -
-          new Date(String(source.startDate).slice(0, 10) + 'T12:00:00').getTime()) /
-          86400000
-      )
-    );
-    const end = new Date(start);
-    end.setDate(end.getDate() + durationDays);
-    // Budget dates are shown as local calendar days. Do not serialize through
-    // UTC here or evening offsets can advance the suggested period by one day.
-    const toInputDate = (date: Date) =>
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const dates = nextBudgetDates(String(source.startDate), String(source.endDate));
     setNextPeriodName('');
-    setNextPeriodStart(toInputDate(start));
-    setNextPeriodEnd(toInputDate(end));
+    setNextPeriodStart(dates.start);
+    setNextPeriodEnd(dates.end);
     setHandoffError(null);
     setIsHandoffOpen(true);
   };

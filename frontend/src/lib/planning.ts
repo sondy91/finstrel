@@ -45,3 +45,28 @@ export const dayLabel = (s: string) =>
   });
 export const frequencyLabel = (r: Rule) =>
   frequencies.find((f) => f[0] === r.cadence)?.[1] || r.cadence;
+
+// Preserve calendar months while keeping fixed-length pay periods the same length.
+export function nextBudgetDates(startValue: string, endValue: string) {
+  const start = new Date(`${startValue.slice(0, 10)}T12:00:00`);
+  const end = new Date(`${endValue.slice(0, 10)}T12:00:00`);
+  const nextStart = new Date(end);
+  nextStart.setDate(nextStart.getDate() + 1);
+  const lastOfMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+  let nextEnd: Date;
+  if (
+    start.getDate() === 1 &&
+    start.getMonth() === end.getMonth() &&
+    start.getFullYear() === end.getFullYear() &&
+    end.getDate() === lastOfMonth
+  ) {
+    nextEnd = new Date(nextStart.getFullYear(), nextStart.getMonth() + 1, 0, 12);
+  } else {
+    const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+    const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+    const duration = Math.max(1, Math.round((endDay - startDay) / 86400000));
+    nextEnd = new Date(nextStart);
+    nextEnd.setDate(nextEnd.getDate() + duration);
+  }
+  return { start: dateKey(nextStart), end: dateKey(nextEnd) };
+}
