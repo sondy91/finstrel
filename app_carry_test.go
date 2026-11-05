@@ -74,3 +74,29 @@ func TestCarryKeepsOverspendingAndRejectsIncompleteHistory(t *testing.T) {
 	_, err = carryBalances(period.ID, models.BudgetReview{UnsupportedCurrencyCount: 1})
 	require.Error(t, err)
 }
+
+func TestLinkedBudgetDatesCannotOverlap(t *testing.T) {
+	cleanup := setupTempDBAppForAccount(t)
+	defer cleanup()
+	app := NewApp()
+	_, err := app.AddCategoryWithDefault("Food", "Expense", nil, 100)
+	require.NoError(t, err)
+	first, err := app.AddBudgetPeriod("October", "2026-10-01", "2026-10-31", "Open")
+	require.NoError(t, err)
+	next, err := database.StartNextBudget(first.ID, models.BudgetPeriod{Name: "November", StartDate: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), EndDate: time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC)}, map[int64]float64{})
+	require.NoError(t, err)
+	_, err = app.UpdateBudgetPeriod(first.ID, "October", "2026-10-01", "2026-11-01")
+	require.ErrorContains(t, err, "overlap")
+	_, err = app.UpdateBudgetPeriod(next.ID, "November", "2026-10-31", "2026-11-30")
+	require.ErrorContains(t, err, "overlap")
+	_, err = app.UpdateBudgetPeriod(first.ID, "October edited", "2026-10-02", "2026-10-30")
+	require.NoError(t, err)
+	periods, err := app.GetBudgetPeriods()
+	require.NoError(t, err)
+	require.Len(t, periods, 2)
+	for _, p := range periods {
+		if p.ID == next.ID {
+			require.Equal(t, "2026-11-01", p.StartDate.Format("2006-01-02"))
+		}
+	}
+}

@@ -481,8 +481,16 @@ export function createPracticeSession(cached?: BankFeedView, now = new Date()): 
       return next;
     },
     PopulateBudgetPeriodFromDefaults: populate,
-    UpdateBudgetPeriod: (id: number, name: string, startDate: string, endDate: string) =>
-      Object.assign(period(id), { name, startDate, endDate }),
+    UpdateBudgetPeriod: (id: number, name: string, startDate: string, endDate: string) => {
+      const earlier = handoffs.find((h) => h.targetId === id);
+      const later = handoffs.find((h) => h.sourceId === id);
+      if (
+        (earlier && period(earlier.sourceId).endDate.slice(0, 10) >= startDate) ||
+        (later && period(later.targetId).startDate.slice(0, 10) <= endDate)
+      )
+        throw new Error('Dates overlap a linked budget.');
+      return Object.assign(period(id), { name, startDate, endDate });
+    },
     AddBudgetAllocation: (budgetPeriodId: number, categoryId: number, allocatedAmount: number) => {
       period(budgetPeriodId);
       if (

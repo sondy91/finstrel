@@ -394,7 +394,7 @@ const BudgetPage: React.FC<{ onBrowseTransactions?: (filter: TransactionFilter) 
     } catch (err: any) {
       console.error('Failed to update period', err);
       // Show error in dialog if possible, or alert
-      alert('Failed to update period: ' + err.message);
+      alert('Failed to update period: ' + errorText(err));
     }
   };
 

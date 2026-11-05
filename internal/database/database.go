@@ -840,17 +840,27 @@ func UpdateBudgetPeriod(period models.BudgetPeriod) (models.BudgetPeriod, error)
 	startDateStr := period.StartDate.UTC().Format("2006-01-02 15:04:05")
 	endDateStr := period.EndDate.UTC().Format("2006-01-02 15:04:05")
 
-	stmt, err := db.Prepare("UPDATE budget_periods SET name = ?, start_date = ?, end_date = ? WHERE id = ?")
+	stmt, err := db.Prepare(`UPDATE budget_periods SET name = ?, start_date = ?, end_date = ? WHERE id = ?
+        AND NOT EXISTS (SELECT 1 FROM budget_handoffs h JOIN budget_periods previous ON previous.id=h.source_period_id
+            WHERE h.target_period_id=budget_periods.id AND date(previous.end_date)>=date(?))
+        AND NOT EXISTS (SELECT 1 FROM budget_handoffs h JOIN budget_periods next ON next.id=h.target_period_id
+            WHERE h.source_period_id=budget_periods.id AND date(next.start_date)<=date(?))`)
 	if err != nil {
 		log.Printf("Error preparing update budget period statement: %v", err)
 		return models.BudgetPeriod{}, err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(period.Name, startDateStr, endDateStr, period.ID)
+	res, err := stmt.Exec(period.Name, startDateStr, endDateStr, period.ID, startDateStr, endDateStr)
 	if err != nil {
 		log.Printf("Error executing update budget period statement for ID %d: %v", period.ID, err)
 		return models.BudgetPeriod{}, err
+	}
+
+	if n, err := res.RowsAffected(); err != nil {
+		return models.BudgetPeriod{}, err
+	} else if n == 0 {
+		return models.BudgetPeriod{}, fmt.Errorf("budget not found or dates overlap a linked budget")
 	}
 
 	log.Printf("Budget period ID %d updated successfully.", period.ID)
