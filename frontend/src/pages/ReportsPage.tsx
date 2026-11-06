@@ -100,25 +100,46 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             {data.categoryData.length ? (
-              <div className="h-[300px] w-full min-w-0" aria-label="Spending by category chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.categoryData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                    >
-                      {data.categoryData.map((entry, index) => (
-                        <Cell key={entry.name} fill={colors[index % colors.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => `$${formatMoney(value)}`} />
-                  </PieChart>
-                </ResponsiveContainer>
+              <div aria-label="Spending by category chart">
+                <div className="h-[220px] w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={data.categoryData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {data.categoryData.map((entry, index) => (
+                          <Cell key={entry.name} fill={colors[index % colors.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `$${formatMoney(value)}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
+                  {data.categoryData.map((entry, index) => (
+                    <li key={entry.name} className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="h-3 w-3 shrink-0 rounded-sm"
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      />
+                      <span>
+                        {entry.name}{' '}
+                        {Math.round(
+                          (entry.value /
+                            data.categoryData.reduce((sum, item) => sum + item.value, 0)) *
+                            100
+                        )}
+                        %
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : (
               <p className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
