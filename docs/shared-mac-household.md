@@ -2,6 +2,14 @@
 
 Finstrel needs to let two separate macOS login accounts use the same household without requiring cloud sync. Both people should retain their own macOS logins and see and manage the same connected banks and imported transactions; single-user households must continue to work.
 
+## Bank access and account ownership
+
+A household can connect joint accounts and accounts held by just one person, including loans and credit cards. Household members can view imported accounts and transactions even when only one person has their own bank login. The bank connection's person and an individual account's ownership are separate: one bank connection can contain both shared and individual accounts.
+
+Make account ownership optional and editable: a household member, shared, or unspecified. Do not infer legal ownership from which person connected a bank. Display a compact ownership label where useful, without repeating it unnecessarily throughout the app. Existing accounts must remain unspecified until someone chooses a label.
+
+Sharing imported data inside Finstrel does not give another person their partner's bank login. Reauthentication may require someone who can sign in at that institution. The household should have clear connection and reconnect status without exposing passwords, Plaid tokens, or encryption keys.
+
 ## Current boundaries
 
 - The SQLite database is named `finstrel.db` relative to the app's working directory. It is not yet in a stable shared location.
@@ -14,7 +22,7 @@ Finstrel needs to let two separate macOS login accounts use the same household w
 1. Provision an explicit household directory with access restricted to the two intended macOS users. Do not rely on the default permissions of `/Users/Shared`. Verify permissions on newly created SQLite journal and temporary files as well as existing files.
 2. Give the household a stable identifier and path independent of the working directory. Detect an existing local database and preserve a recoverable backup. Do not silently replace, merge, or delete either account's existing data.
 3. Define and test concurrent access before allowing two app processes to write. SQLite updates need bounded busy handling and transaction boundaries; encrypted bank snapshots need a cross-process lock covering the whole read-modify-write operation, including sync and disconnect. A process-local mutex or atomic file replacement alone is insufficient.
-4. Design how the second user receives access to shared bank data and authorized bank credentials. macOS login keychains are separate; moving the encrypted file alone does not share its key. Never put plaintext Plaid tokens or encryption keys in a shared folder. Both accounts must show consistent balances and transaction history, and either person must be able to manage the connections.
+4. Design how the second user receives access to shared bank data and authorized bank credentials. macOS login keychains are separate; moving the encrypted file alone does not share its key. Never put plaintext Plaid tokens or encryption keys in a shared folder. Both macOS accounts must show consistent balances and transaction history and offer connection management; the person reconnecting must be able to authenticate with the institution.
 5. Handle macOS fast user switching, locked sessions, revoked access, backups and recovery. Stop with a clear error if access, keys, or locks are unavailable; never initialize a blank replacement household in their place.
 6. Use disposable macOS accounts and synthetic data to verify allowed and denied access, simultaneous edits and imports, interrupted migration, restart, backup restoration and rollback. No existing household should be migrated until those checks pass.
 
