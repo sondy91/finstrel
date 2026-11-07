@@ -33,7 +33,7 @@ func TestCashFlowSummaryUsesSpendableCashBillsAndPeriodScopedEnvelopes(t *testin
 	require.NoError(t, err)
 	require.NoError(t, app.UpdateCashFlowSettings(now.AddDate(0, 0, 7).Format("2006-01-02"), 100))
 
-	summary, err := app.GetCashFlowSummary()
+	summary, err := cashFlowSummary(now, func() (bankfeed.View, error) { return bankfeed.View{}, nil })
 	require.NoError(t, err)
 	require.Equal(t, 900.0, summary.CashAvailable)
 	require.Equal(t, 200.0, summary.UpcomingBills)

@@ -20,6 +20,7 @@ type App struct {
 	ctx       context.Context
 	bankMu    sync.Mutex
 	bankFeeds *bankfeed.Service
+	bankView  func() (bankfeed.View, error)
 }
 
 // UpdateBudgetPeriodStatus updates a budget period's status.

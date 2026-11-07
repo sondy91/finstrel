@@ -100,3 +100,47 @@ func TestLinkedBudgetDatesCannotOverlap(t *testing.T) {
 		}
 	}
 }
+
+// Exercise the same app methods used by Wails against a real temporary database.
+func TestAppCarryHandoffAndReconcile(t *testing.T) {
+	cleanup := setupTempDBAppForAccount(t)
+	defer cleanup()
+	app := NewApp()
+	category, err := app.AddCategoryWithDefault("Food", "Expense", nil, 100)
+	require.NoError(t, err)
+	source, err := app.AddBudgetPeriod("October", "2026-10-01", "2026-10-31", "Open")
+	require.NoError(t, err)
+	feed := bankfeed.View{Items: []bankfeed.Item{{Transactions: []bankfeed.Transaction{{Date: "2026-10-15", Currency: "USD", Amount: -30, BudgetCategoryID: category.ID}}}}}
+	app.bankView = func() (bankfeed.View, error) { return feed, nil }
+	feed.Items[0].Transactions = append(feed.Items[0].Transactions, bankfeed.Transaction{Date: "2026-10-16", Currency: "USD", Amount: -10})
+	_, err = app.StartNextBudget(source.ID, "November", "2026-11-01", "2026-11-30")
+	require.ErrorContains(t, err, "categorize or exclude")
+	periods, err := app.GetBudgetPeriods()
+	require.NoError(t, err)
+	require.Len(t, periods, 1)
+	require.Equal(t, "Open", periods[0].Status)
+	feed.Items[0].Transactions = feed.Items[0].Transactions[:1]
+	target, err := app.StartNextBudget(source.ID, "November", "2026-11-01", "2026-11-30")
+	require.NoError(t, err)
+	allocation, err := app.GetBudgetAllocation(target.ID, category.ID)
+	require.NoError(t, err)
+	require.Equal(t, 170.0, allocation.AllocatedAmount)
+	require.NoError(t, app.UpdateBudgetPeriodStatus(source.ID, "Open"))
+	sourceAllocation, err := app.GetBudgetAllocation(source.ID, category.ID)
+	require.NoError(t, err)
+	_, err = app.UpdateBudgetAllocation(sourceAllocation.ID, 120)
+	require.NoError(t, err)
+	status, err := app.GetCarryStatus(target.ID)
+	require.NoError(t, err)
+	require.Equal(t, 20.0, status.Changes[category.ID])
+	require.Error(t, app.ReconcileBudgetCarry(target.ID))
+	require.NoError(t, app.UpdateBudgetPeriodStatus(source.ID, "Closed"))
+	require.NoError(t, app.ReconcileBudgetCarry(target.ID))
+	require.NoError(t, app.ReconcileBudgetCarry(target.ID))
+	allocation, err = app.GetBudgetAllocation(target.ID, category.ID)
+	require.NoError(t, err)
+	require.Equal(t, 190.0, allocation.AllocatedAmount)
+	status, err = app.GetCarryStatus(target.ID)
+	require.NoError(t, err)
+	require.Empty(t, status.Changes)
+}

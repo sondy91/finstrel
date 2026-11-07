@@ -132,7 +132,11 @@ func (a *App) PreviewBudgetWindow(start, cadence string) (models.BudgetWindow, e
 // Review reads imported snapshots only. It does not sync, post transactions,
 // infer reconciliation, or claim that available history covers the whole period.
 func (a *App) GetBudgetReview(periodID int64) (models.BudgetReview, error) {
-	return reviewBudget(periodID, a.GetBankFeedView)
+	readFeeds := a.GetBankFeedView
+	if a.bankView != nil {
+		readFeeds = a.bankView
+	}
+	return reviewBudget(periodID, readFeeds)
 }
 
 func reviewBudget(periodID int64, readFeeds func() (bankfeed.View, error)) (models.BudgetReview, error) {
