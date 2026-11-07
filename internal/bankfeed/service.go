@@ -75,6 +75,11 @@ func (s *Service) view(state snapshot) View {
 func (s *Service) View() (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(context.Background())
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	state, err := s.vault.load()
 	if err != nil {
 		return View{}, err
@@ -94,6 +99,11 @@ func (s *Service) SetTransactionExcluded(itemID, transactionID string, excluded 
 func (s *Service) updateTransaction(itemID, transactionID string, update func(*Transaction)) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(context.Background())
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	state, err := s.vault.load()
 	if err != nil {
 		return View{}, err
@@ -147,6 +157,11 @@ func hostedURL(raw string) bool {
 func (s *Service) StartLink(ctx context.Context, itemID string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	if err := s.ready(); err != nil {
 		return "", err
 	}
@@ -215,6 +230,11 @@ func (s *Service) StartLink(ctx context.Context, itemID string) (string, error) 
 func (s *Service) FinishLink(ctx context.Context, sessionID string) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	if err := s.ready(); err != nil {
 		return View{}, err
 	}
@@ -403,6 +423,11 @@ func removePlaceholder(items []record, id string) []record {
 func (s *Service) CancelLink(sessionID string) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(context.Background())
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	state, err := s.vault.load()
 	if err != nil {
 		return View{}, err
@@ -467,6 +492,11 @@ func emptyItem(id, institution string) Item {
 func (s *Service) Import(ctx context.Context) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	if err := s.ready(); err != nil {
 		return View{}, err
 	}
@@ -481,6 +511,11 @@ func (s *Service) Import(ctx context.Context) (View, error) {
 func (s *Service) AutoImport(ctx context.Context) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	state, err := s.vault.load()
 	if err != nil {
 		return View{}, err
@@ -495,6 +530,11 @@ func (s *Service) AutoImport(ctx context.Context) (View, error) {
 func (s *Service) ImportItem(ctx context.Context, itemID string) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	if err := s.ready(); err != nil {
 		return View{}, err
 	}
@@ -888,6 +928,11 @@ func (s *Service) investmentActivity(ctx context.Context, token string) ([]Inves
 func (s *Service) Disconnect(ctx context.Context, itemID string) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	unlock, err := s.vault.lock(ctx)
+	if err != nil {
+		return View{}, err
+	}
+	defer unlock()
 	if err := s.ready(); err != nil {
 		return View{}, err
 	}
