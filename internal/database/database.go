@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,40 +20,69 @@ var db *sql.DB
 
 const dbFileName = "finstrel.db"
 
-// InitDB initializes the database connection and creates tables if they don't exist.
-func InitDB() error {
-	// Determine data directory (e.g., in user's config or app data folder)
-	// For simplicity now, we'll place it next to the executable or in the current dir
-	// A more robust solution would use os.UserConfigDir() or similar.
-	dbPath := dbFileName
+// InitDB preserves the existing working-directory database until a household
+// is explicitly migrated and selected.
+func InitDB() error { return InitDBAt(dbFileName) }
 
-	// Check if the database file exists, create directory if needed (though not strictly needed for current path)
+// InitDBAt opens the given ledger path. It does not migrate or select a household.
+func InitDBAt(path string) error { return initDBAt(path, false) }
+
+// OpenExistingDBAt refuses to create a missing ledger when selecting an existing household.
+func OpenExistingDBAt(path string) error { return initDBAt(path, true) }
+
+func initDBAt(path string, existing bool) error {
+	if db != nil && db.Ping() == nil {
+		return fmt.Errorf("close the current household before opening another")
+	}
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("database path is required")
+	}
+	dbPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("resolve database path: %w", err)
+	}
 	dbDir := filepath.Dir(dbPath)
-	if _, err := os.Stat(dbDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dbDir, 0750); err != nil {
-			log.Printf("Error creating database directory: %v", err)
-			return err
+	if !existing {
+		if err = os.MkdirAll(dbDir, 0700); err != nil {
+			return fmt.Errorf("prepare database directory: %w", err)
 		}
 	}
-
+	u := &url.URL{Scheme: "file", Path: filepath.ToSlash(dbPath)}
+	query := u.Query()
+	if existing {
+		query.Set("mode", "rw")
+	}
+	query.Set("_foreign_keys", "on")
+	query.Set("_busy_timeout", "5000")
+	u.RawQuery = query.Encode()
 	log.Printf("Initializing database at: %s", dbPath)
-	var err error
-	db, err = sql.Open("sqlite3", dbPath+"?_foreign_keys=on") // Enable foreign key constraints
+	connection, err := sql.Open("sqlite3", u.String())
 	if err != nil {
-		log.Printf("Error opening database: %v", err)
 		return err
 	}
-
-	// Check the connection
-	if err = db.Ping(); err != nil {
-		log.Printf("Error pinging database: %v", err)
+	if err = connection.Ping(); err != nil {
+		connection.Close()
 		return err
 	}
-
-	log.Println("Database connection established.")
-
-	// Create tables
-	return createTables()
+	if existing {
+		var count int
+		if err = connection.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='budget_periods'").Scan(&count); err != nil {
+			connection.Close()
+			return fmt.Errorf("inspect existing household: %w", err)
+		}
+		if count != 1 {
+			connection.Close()
+			return fmt.Errorf("existing household database is not recognized")
+		}
+	}
+	db = connection
+	if err = createTables(); err != nil {
+		connection.Close()
+		db = nil
+		return err
+	}
+	log.Println("Database tables checked/created successfully.")
+	return nil
 }
 
 // GetDB returns the database connection pool.
