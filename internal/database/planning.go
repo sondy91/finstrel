@@ -14,6 +14,7 @@ import (
 // builds must not be used to forecast new non-monthly rules (they cannot read them).
 func createPlanningTables(tx *sql.Tx) error {
 	for _, q := range []string{
+		`CREATE TABLE IF NOT EXISTS bank_account_labels (item_id TEXT NOT NULL, account_id TEXT NOT NULL, label TEXT NOT NULL, PRIMARY KEY(item_id, account_id))`,
 		`CREATE TABLE IF NOT EXISTS bill_recurrences (bill_id INTEGER PRIMARY KEY REFERENCES bills(id) ON DELETE CASCADE, rule TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS income_schedules (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, amount REAL NOT NULL CHECK(amount>=0), active INTEGER NOT NULL DEFAULT 1, rule TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS budget_handoffs (id INTEGER PRIMARY KEY AUTOINCREMENT, source_period_id INTEGER NOT NULL UNIQUE REFERENCES budget_periods(id), target_period_id INTEGER NOT NULL UNIQUE REFERENCES budget_periods(id), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,

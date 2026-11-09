@@ -14,11 +14,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   CancelBankLink,
   DisconnectBankFeed,
   FinishBankLink,
   GetBankFeedView,
+  GetBankAccountLabels,
+  SetBankAccountLabel,
   ImportBankFeed,
   ImportBankFeeds,
   StartBankLink,
@@ -104,6 +107,16 @@ const BankConnectionsPanel: React.FC<{
   centerControls?: boolean;
 }> = ({ onBrowseTransactions, centerControls = false }) => {
   const [view, setView] = useState<BankFeedView | null>(null);
+  const [accountLabels, setAccountLabels] = useState<
+    { itemId: string; accountId: string; label: string }[]
+  >([]);
+  const [editingOwner, setEditingOwner] = useState<{
+    itemId: string;
+    account: BankFeedAccount;
+  } | null>(null);
+  const [ownerDraft, setOwnerDraft] = useState('');
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerError, setOwnerError] = useState('');
   const [busy, setBusy] = useState('Loading bank connections…');
   const [error, setError] = useState('');
   const [connectedNotice, setConnectedNotice] = useState('');
@@ -120,6 +133,13 @@ const BankConnectionsPanel: React.FC<{
 
   useEffect(() => {
     mounted.current = true;
+    GetBankAccountLabels()
+      .then((labels) => {
+        if (mounted.current) setAccountLabels(labels || []);
+      })
+      .catch((reason) => {
+        if (mounted.current) setError(safeMessage(reason));
+      });
     GetBankFeedView()
       .then((result) => {
         if (mounted.current) applyView(result);
@@ -403,6 +423,25 @@ const BankConnectionsPanel: React.FC<{
                             {account.mask ? ` · ••${account.mask}` : ''}
                           </span>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Set owner for ${account.name}`}
+                          onClick={() => {
+                            setEditingOwner({ itemId: item.id, account });
+                            setOwnerDraft(
+                              accountLabels.find(
+                                (label) =>
+                                  label.itemId === item.id && label.accountId === account.id
+                              )?.label || ''
+                            );
+                            setOwnerError('');
+                          }}
+                        >
+                          {accountLabels.find(
+                            (label) => label.itemId === item.id && label.accountId === account.id
+                          )?.label || 'Add owner'}
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -464,6 +503,65 @@ const BankConnectionsPanel: React.FC<{
         );
       })}
 
+      <Dialog
+        open={!!editingOwner}
+        onOpenChange={(open) => {
+          if (!open && !ownerSaving) setEditingOwner(null);
+        }}
+      >
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Account owner</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!editingOwner || ownerSaving) return;
+              setOwnerSaving(true);
+              setOwnerError('');
+              try {
+                await SetBankAccountLabel(editingOwner.itemId, editingOwner.account.id, ownerDraft);
+                const label = ownerDraft.trim();
+                setAccountLabels((previous) => [
+                  ...previous.filter(
+                    (entry) =>
+                      entry.itemId !== editingOwner.itemId ||
+                      entry.accountId !== editingOwner.account.id
+                  ),
+                  ...(label
+                    ? [{ itemId: editingOwner.itemId, accountId: editingOwner.account.id, label }]
+                    : []),
+                ]);
+                setEditingOwner(null);
+              } catch (reason) {
+                setOwnerError(safeMessage(reason));
+              } finally {
+                setOwnerSaving(false);
+              }
+            }}
+          >
+            <label className="block text-sm font-medium" htmlFor="bank-account-owner">
+              {editingOwner?.account.name}
+            </label>
+            <input
+              id="bank-account-owner"
+              className="mt-2 h-10 w-full rounded-md border bg-background px-3 text-sm"
+              maxLength={80}
+              value={ownerDraft}
+              onChange={(event) => setOwnerDraft(event.target.value)}
+              placeholder="Name or Shared"
+            />
+            {ownerError && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {ownerError}
+              </p>
+            )}
+            <Button className="mt-4" disabled={ownerSaving} type="submit">
+              {ownerSaving ? 'Saving…' : 'Save'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       <AlertDialog
         open={!!disconnectItem}
         onOpenChange={(open) => {

@@ -8,6 +8,8 @@ vi.mock('@/lib/bankUpdates', () => ({ onBankFeedsUpdated: vi.fn() }));
 
 vi.mock('../wailsAdapter', () => ({
   GetBankFeedView: vi.fn(),
+  GetBankAccountLabels: vi.fn(),
+  SetBankAccountLabel: vi.fn(),
   StartBankLink: vi.fn(),
   FinishBankLink: vi.fn(),
   CancelBankLink: vi.fn(),
@@ -107,6 +109,7 @@ async function load(view: BankFeedView = emptyView) {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(onBankFeedsUpdated).mockReturnValue(() => {});
+  vi.mocked(Adapter.GetBankAccountLabels).mockResolvedValue([]);
 });
 afterEach(cleanup);
 
@@ -413,4 +416,37 @@ it('shows investment account names without exposing investment detail', async ()
     screen.queryByRole('button', { name: 'View Retirement IRA transactions' })
   ).not.toBeInTheDocument();
   expect(screen.queryByText('Investment activity (1)')).not.toBeInTheDocument();
+});
+
+it('lets a user label one account without changing another', async () => {
+  vi.mocked(Adapter.GetBankFeedView).mockResolvedValue({ ...emptyView, items: [bank] });
+  vi.mocked(Adapter.SetBankAccountLabel).mockResolvedValue(undefined);
+  const user = userEvent.setup();
+  render(<BankConnectionsPanel />);
+  await user.click(await screen.findByText('Test Bank'));
+  await user.click(screen.getByRole('button', { name: 'Set owner for Household checking' }));
+  await user.type(screen.getByPlaceholderText('Name or Shared'), 'Shared');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(Adapter.SetBankAccountLabel).toHaveBeenCalledWith('local-item-1', 'checking', 'Shared')
+  );
+  expect(
+    screen.getByRole('button', { name: 'Set owner for Household checking' })
+  ).toHaveTextContent('Shared');
+  expect(screen.getByRole('button', { name: 'Set owner for Household card' })).toHaveTextContent(
+    'Add owner'
+  );
+});
+
+it('keeps the owner dialog open when saving fails', async () => {
+  vi.mocked(Adapter.GetBankFeedView).mockResolvedValue({ ...emptyView, items: [bank] });
+  vi.mocked(Adapter.SetBankAccountLabel).mockRejectedValue('Could not save');
+  const user = userEvent.setup();
+  render(<BankConnectionsPanel />);
+  await user.click(await screen.findByText('Test Bank'));
+  await user.click(screen.getByRole('button', { name: 'Set owner for Household card' }));
+  await user.type(screen.getByPlaceholderText('Name or Shared'), 'Alex');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not save');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
 });
