@@ -35,6 +35,7 @@ type vault struct {
 	path, namespace string
 	credentials     credentials
 	key             []byte
+	shared          bool
 }
 
 func newVault(dir, environment string, secrets credentials) *vault {
@@ -80,6 +81,9 @@ func (v *vault) cipher(create bool) (cipher.AEAD, error) {
 
 func (v *vault) load() (snapshot, error) {
 	state := snapshot{Version: 1, Items: []record{}}
+	if v.shared {
+		state.Version = 3
+	}
 	data, err := os.ReadFile(v.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return state, nil
@@ -95,13 +99,21 @@ func (v *vault) load() (snapshot, error) {
 		return state, errStorage
 	}
 	plain, err := aead.Open(nil, data[4:4+aead.NonceSize()], data[4+aead.NonceSize():], []byte(v.namespace))
-	if err != nil || json.Unmarshal(plain, &state) != nil || (state.Version != 1 && state.Version != 2) {
+	if err != nil || json.Unmarshal(plain, &state) != nil ||
+		(v.shared && state.Version != 3) || (!v.shared && state.Version != 1 && state.Version != 2) {
 		return snapshot{}, errStorage
 	}
 	return state, nil
 }
 
 func (v *vault) save(state snapshot) error {
+	// Shared snapshots must stay unreadable by older clients that do not take
+	// the cross-process lock. Some operations set legacy versions themselves.
+	if v.shared {
+		state.Version = 3
+	} else if state.Version != 1 && state.Version != 2 {
+		return errStorage
+	}
 	_, err := os.Stat(v.path)
 	aead, err := v.cipher(errors.Is(err, os.ErrNotExist))
 	if err != nil {

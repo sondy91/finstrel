@@ -51,6 +51,7 @@ func TestSharedCredentialsDeleteAndVaultAccess(t *testing.T) {
 	wrapped, err := household.WrapKey([]byte("fictional shared passphrase"), key)
 	require.NoError(t, err)
 	v := newVault(dir, "sandbox", nil)
+	v.shared = true
 	store, err := newSharedCredentials(filepath.Join(dir, "credentials.enc"), v.namespace, key)
 	require.NoError(t, err)
 	require.NoError(t, store.create())
@@ -64,11 +65,17 @@ func TestSharedCredentialsDeleteAndVaultAccess(t *testing.T) {
 	require.Equal(t, "fictional-bank-token", read.Token)
 	// A second unlocked session can use the same encrypted snapshot and credentials.
 	v2 := newVault(dir, "sandbox", nil)
+	v2.shared = true
 	unlocked, err := household.UnwrapKey([]byte("fictional shared passphrase"), wrapped)
 	require.NoError(t, err)
 	second, err := newSharedCredentials(store.path, v2.namespace, unlocked)
 	require.NoError(t, err)
 	v2.credentials = second
+	// An older reader must reject the shared snapshot even when it has the key.
+	legacy := newVault(dir, "sandbox", second)
+	_, err = legacy.load()
+	require.ErrorIs(t, err, errStorage)
+	require.ErrorIs(t, legacy.save(snapshot{Version: 3}), errStorage)
 	view, err := (&Service{vault: v2}).View()
 	require.NoError(t, err)
 	require.Len(t, view.Items, 1)
@@ -91,4 +98,19 @@ func TestSharedCredentialsDeleteAndVaultAccess(t *testing.T) {
 	require.NoError(t, v2.deleteToken("bank"))
 	_, err = v.connection("bank")
 	require.ErrorIs(t, err, keyring.ErrNotFound)
+}
+
+func TestSharedVaultRejectsLegacySnapshot(t *testing.T) {
+	dir := t.TempDir()
+	key := bytes.Repeat([]byte{5}, 32)
+	legacy := newVault(dir, "sandbox", nil)
+	store, err := newSharedCredentials(filepath.Join(dir, "credentials.enc"), legacy.namespace, key)
+	require.NoError(t, err)
+	require.NoError(t, store.create())
+	legacy.credentials = store
+	require.NoError(t, legacy.save(snapshot{Version: 2}))
+	shared := newVault(dir, "sandbox", store)
+	shared.shared = true
+	_, err = shared.load()
+	require.ErrorIs(t, err, errStorage)
 }
