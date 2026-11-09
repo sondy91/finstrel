@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"finstrel/internal/bankfeed"
+	"finstrel/internal/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,6 +24,12 @@ func TestBankAccountLabelsArePerAccountAndEditable(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, labels, 2)
 	require.Equal(t, "Alex", labels[0].Label)
+	require.Equal(t, "Shared", labels[1].Label)
+	database.CloseDB()
+	require.NoError(t, database.InitDB())
+	labels, err = app.GetBankAccountLabels()
+	require.NoError(t, err)
+	require.Len(t, labels, 2)
 	require.Equal(t, "Shared", labels[1].Label)
 	require.Error(t, app.SetBankAccountLabel("bank", "missing", "Shared"))
 	require.Error(t, app.SetBankAccountLabel("bank", "checking", "Bad\nlabel"))
