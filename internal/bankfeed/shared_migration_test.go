@@ -70,3 +70,28 @@ func TestStageSharedVaultFailsBeforeCreatingDestination(t *testing.T) {
 	_, err = os.Stat(dir)
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
+
+func TestOpenSharedVaultFailsClosed(t *testing.T) {
+	secrets := &memoryCredentials{values: map[string]string{}}
+	s := &Service{environment: "sandbox", vault: newVault(t.TempDir(), "sandbox", secrets)}
+	seed(t, s, record{Item: emptyItem("one", "Bank")})
+	dir := filepath.Join(t.TempDir(), "shared")
+	passphrase := []byte("fictional household passphrase")
+	require.NoError(t, s.stageSharedVault(context.Background(), dir, passphrase))
+	v, err := openSharedVault(dir, "sandbox", passphrase)
+	require.NoError(t, err)
+	token, err := v.token("one")
+	require.NoError(t, err)
+	require.Equal(t, "fictional-test-credential", token)
+	_, err = openSharedVault(dir, "sandbox", []byte("wrong"))
+	require.ErrorIs(t, err, errStorage)
+	_, err = openSharedVault(dir, "production", passphrase)
+	require.ErrorIs(t, err, errStorage)
+	require.NoError(t, os.Remove(filepath.Join(dir, "feed.enc")))
+	_, err = openSharedVault(dir, "sandbox", passphrase)
+	require.ErrorIs(t, err, errStorage)
+	_, err = v.load()
+	require.ErrorIs(t, err, errStorage)
+	_, err = os.Stat(filepath.Join(dir, "feed.enc"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+}

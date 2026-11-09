@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -11,6 +12,46 @@ import (
 
 	"github.com/zalando/go-keyring"
 )
+
+// openSharedVault only opens a complete stage; it never creates replacement
+// files when a key, credential store, or snapshot is missing or invalid.
+func openSharedVault(dir, environment string, passphrase []byte) (*vault, error) {
+	if dir == "" || len(passphrase) == 0 {
+		return nil, errStorage
+	}
+	f, err := os.Open(filepath.Join(dir, "household.key"))
+	if err != nil {
+		return nil, errStorage
+	}
+	envelope, err := io.ReadAll(io.LimitReader(f, 1024))
+	closeErr := f.Close()
+	if err != nil || closeErr != nil {
+		return nil, errStorage
+	}
+	key, err := household.UnwrapKey(passphrase, envelope)
+	if err != nil {
+		return nil, errStorage
+	}
+	defer clear(key)
+	v := newVault(dir, environment, nil)
+	v.shared = true
+	v.credentials, err = newSharedCredentials(filepath.Join(dir, "credentials.enc"), v.namespace, key)
+	if err != nil {
+		return nil, errStorage
+	}
+	if _, err = os.Stat(v.path); err != nil {
+		return nil, errStorage
+	}
+	unlock, err := v.lock(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
+	if _, err = v.load(); err != nil {
+		return nil, errStorage
+	}
+	return v, nil
+}
 
 // stageSharedVault creates an inactive copy in a new directory at its final
 // path. It does not switch the app, remove source credentials, or establish

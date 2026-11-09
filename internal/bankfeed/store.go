@@ -86,6 +86,9 @@ func (v *vault) load() (snapshot, error) {
 	}
 	data, err := os.ReadFile(v.path)
 	if errors.Is(err, os.ErrNotExist) {
+		if v.shared {
+			return snapshot{}, errStorage
+		}
 		return state, nil
 	}
 	if err != nil {
