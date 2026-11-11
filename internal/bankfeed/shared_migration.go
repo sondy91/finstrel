@@ -77,6 +77,19 @@ func (s *Service) StageSharedHousehold(ctx context.Context, householdDir, source
 	})
 }
 
+// PrepareSharedHousehold provisions an empty protected macOS directory before
+// staging either data source. It never activates the copy. If staging fails,
+// the incomplete directory remains for explicit inspection or removal.
+func (s *Service) PrepareSharedHousehold(ctx context.Context, householdDir, partner, sourceLedger string, passphrase []byte) error {
+	if len(passphrase) == 0 || sourceLedger == "" {
+		return errStorage
+	}
+	if err := household.CreateSharedDirectory(householdDir, partner); err != nil {
+		return err
+	}
+	return s.StageSharedHousehold(ctx, householdDir, sourceLedger, passphrase)
+}
+
 func (s *Service) stageSharedVaultWith(ctx context.Context, dir string, passphrase []byte, stageLedger func() error) error {
 	if len(passphrase) == 0 || dir == "" {
 		return errStorage
