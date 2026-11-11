@@ -2,6 +2,7 @@ package bankfeed
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,6 +51,45 @@ func TestStageSharedVaultPreservesSourceAndCredentials(t *testing.T) {
 	unchanged, err := os.ReadFile(filepath.Join(dir, "household.key"))
 	require.NoError(t, err)
 	require.Equal(t, envelope, unchanged)
+}
+
+func TestStageSharedHouseholdCopiesLedgerAndBank(t *testing.T) {
+	secrets := &memoryCredentials{values: map[string]string{}}
+	s := &Service{environment: "sandbox", vault: newVault(t.TempDir(), "sandbox", secrets)}
+	seed(t, s, record{Item: emptyItem("one", "Bank")})
+	root := t.TempDir()
+	source := filepath.Join(root, "original.db")
+	db, err := sql.Open("sqlite3", source)
+	require.NoError(t, err)
+	_, err = db.Exec("CREATE TABLE budget_periods (value TEXT); INSERT INTO budget_periods VALUES ('budget')")
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+	dir := filepath.Join(root, "shared")
+	require.NoError(t, os.Mkdir(dir, 0700))
+	passphrase := []byte("fictional passphrase")
+	require.NoError(t, s.StageSharedHousehold(context.Background(), dir, source, passphrase))
+	v, err := openSharedVault(filepath.Join(dir, "bank"), "sandbox", passphrase)
+	require.NoError(t, err)
+	token, err := v.token("one")
+	require.NoError(t, err)
+	require.Equal(t, "fictional-test-credential", token)
+	copyDB, err := sql.Open("sqlite3", filepath.Join(dir, "finstrel.db")+"?mode=ro")
+	require.NoError(t, err)
+	defer copyDB.Close()
+	var value string
+	require.NoError(t, copyDB.QueryRow("SELECT value FROM budget_periods").Scan(&value))
+	require.Equal(t, "budget", value)
+	require.Error(t, s.StageSharedHousehold(context.Background(), dir, source, passphrase))
+}
+
+func TestStageSharedHouseholdDoesNotCompleteWithoutLedger(t *testing.T) {
+	secrets := &memoryCredentials{values: map[string]string{}}
+	s := &Service{environment: "sandbox", vault: newVault(t.TempDir(), "sandbox", secrets)}
+	seed(t, s, record{Item: emptyItem("one", "Bank")})
+	dir := t.TempDir()
+	require.Error(t, s.StageSharedHousehold(context.Background(), dir, filepath.Join(dir, "missing.db"), []byte("passphrase")))
+	_, err := os.Stat(filepath.Join(dir, "bank", "household.key"))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestStageSharedVaultFailsBeforeCreatingDestination(t *testing.T) {

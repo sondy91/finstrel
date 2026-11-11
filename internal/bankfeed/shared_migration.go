@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"finstrel/internal/database"
 	"finstrel/internal/household"
 
 	"github.com/zalando/go-keyring"
@@ -58,6 +59,25 @@ func openSharedVault(dir, environment string, passphrase []byte) (*vault, error)
 // cross-user access. The caller must keep writes to the source stopped until
 // activation; the bank lock only protects the copy itself.
 func (s *Service) stageSharedVault(ctx context.Context, dir string, passphrase []byte) error {
+	return s.stageSharedVaultWith(ctx, dir, passphrase, nil)
+}
+
+// StageSharedHousehold copies the bank vault and ledger under their respective
+// write locks. The destination must be an already-protected, otherwise empty
+// household directory. This stages a consistent copy but does not activate it
+// or prevent later writes to the original household.
+func (s *Service) StageSharedHousehold(ctx context.Context, householdDir, sourceLedger string, passphrase []byte) error {
+	if !filepath.IsAbs(householdDir) || sourceLedger == "" {
+		return errStorage
+	}
+	return s.stageSharedVaultWith(ctx, filepath.Join(householdDir, "bank"), passphrase, func() error {
+		return database.WithWriteBarrier(ctx, sourceLedger, func() error {
+			return database.CreateSnapshot(ctx, sourceLedger, filepath.Join(householdDir, "finstrel.db"))
+		})
+	})
+}
+
+func (s *Service) stageSharedVaultWith(ctx context.Context, dir string, passphrase []byte, stageLedger func() error) error {
 	if len(passphrase) == 0 || dir == "" {
 		return errStorage
 	}
@@ -147,6 +167,11 @@ func (s *Service) stageSharedVault(ctx context.Context, dir string, passphrase [
 		actual, err := verify.connection(id)
 		if err != nil || actual != expected {
 			return errStorage
+		}
+	}
+	if stageLedger != nil {
+		if err = stageLedger(); err != nil {
+			return err
 		}
 	}
 	if err = ctx.Err(); err != nil {
