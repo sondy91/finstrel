@@ -3,6 +3,7 @@
 package household
 
 import (
+	"database/sql"
 	"os"
 	"os/exec"
 	"os/user"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,6 +37,29 @@ func TestCreateSharedDirectoryInheritsPermissions(t *testing.T) {
 	contents, err := os.ReadFile(file)
 	require.NoError(t, err)
 	require.Equal(t, "fixture", string(contents))
+}
+
+func TestSharedDirectorySQLiteJournalInheritsAccess(t *testing.T) {
+	if _, err := user.Lookup("nobody"); err != nil {
+		t.Skip("no disposable nobody account available")
+	}
+	dir := filepath.Join(t.TempDir(), "household")
+	require.NoError(t, CreateSharedDirectory(dir, "nobody"))
+	path := filepath.Join(dir, "budget.db")
+	db, err := sql.Open("sqlite3", path+"?_journal_mode=DELETE")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	_, err = db.Exec("CREATE TABLE fixture (value TEXT); INSERT INTO fixture VALUES ('before')")
+	require.NoError(t, err)
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = tx.Rollback() })
+	_, err = tx.Exec("UPDATE fixture SET value = 'after'")
+	require.NoError(t, err)
+	output, err := exec.Command("/bin/ls", "-le", path+"-journal").CombinedOutput()
+	require.NoError(t, err, string(output))
+	require.Contains(t, strings.ToLower(string(output)), "nobody")
+	require.Contains(t, string(output), "inherited")
 }
 
 func TestCreateSharedDirectoryRejectsInvalidAccount(t *testing.T) {
