@@ -54,6 +54,20 @@ func openSharedVault(dir, environment string, passphrase []byte) (*vault, error)
 	return v, nil
 }
 
+// OpenSharedHousehold returns a service using the existing Plaid configuration
+// and the unlocked shared vault. It does not switch the app's active ledger or
+// bank service; the caller must coordinate those changes together.
+func (s *Service) OpenSharedHousehold(householdDir string, passphrase []byte) (*Service, error) {
+	if !filepath.IsAbs(householdDir) {
+		return nil, errStorage
+	}
+	v, err := openSharedVault(filepath.Join(householdDir, "bank"), s.environment, passphrase)
+	if err != nil {
+		return nil, err
+	}
+	return &Service{provider: s.provider, vault: v, environment: s.environment, openURL: s.openURL}, nil
+}
+
 // stageSharedVault creates an inactive copy in a new directory at its final
 // path. It does not switch the app, remove source credentials, or establish
 // cross-user access. The caller must keep writes to the source stopped until

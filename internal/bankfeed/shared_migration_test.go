@@ -56,7 +56,9 @@ func TestStageSharedVaultPreservesSourceAndCredentials(t *testing.T) {
 func TestStageSharedHouseholdCopiesLedgerAndBank(t *testing.T) {
 	secrets := &memoryCredentials{values: map[string]string{}}
 	s := &Service{environment: "sandbox", vault: newVault(t.TempDir(), "sandbox", secrets)}
-	seed(t, s, record{Item: emptyItem("one", "Bank")})
+	item := emptyItem("one", "Bank")
+	item.Transactions = []Transaction{{ID: "purchase", Currency: "USD"}}
+	seed(t, s, record{Item: item})
 	root := t.TempDir()
 	source := filepath.Join(root, "original.db")
 	db, err := sql.Open("sqlite3", source)
@@ -73,6 +75,18 @@ func TestStageSharedHouseholdCopiesLedgerAndBank(t *testing.T) {
 	token, err := v.token("one")
 	require.NoError(t, err)
 	require.Equal(t, "fictional-test-credential", token)
+	second, err := s.OpenSharedHousehold(dir, passphrase)
+	require.NoError(t, err)
+	_, err = second.SetTransactionExcluded("one", "purchase", true)
+	require.NoError(t, err)
+	reopened, err := s.OpenSharedHousehold(dir, passphrase)
+	require.NoError(t, err)
+	view, err := reopened.View()
+	require.NoError(t, err)
+	require.True(t, view.Items[0].Transactions[0].ExcludeFromBudget)
+	original, err := s.View()
+	require.NoError(t, err)
+	require.False(t, original.Items[0].Transactions[0].ExcludeFromBudget)
 	copyDB, err := sql.Open("sqlite3", filepath.Join(dir, "finstrel.db")+"?mode=ro")
 	require.NoError(t, err)
 	defer copyDB.Close()
