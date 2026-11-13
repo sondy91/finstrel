@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"finstrel/internal/database"
 	"finstrel/internal/household"
 
 	"github.com/stretchr/testify/require"
@@ -51,6 +53,38 @@ func TestStageSharedVaultPreservesSourceAndCredentials(t *testing.T) {
 	unchanged, err := os.ReadFile(filepath.Join(dir, "household.key"))
 	require.NoError(t, err)
 	require.Equal(t, envelope, unchanged)
+}
+
+func TestHouseholdCompletionIsPublishedWhileBothSourcesAreLocked(t *testing.T) {
+	secrets := &memoryCredentials{values: map[string]string{}}
+	s := &Service{environment: "sandbox", vault: newVault(t.TempDir(), "sandbox", secrets)}
+	seed(t, s, record{Item: emptyItem("one", "Bank")})
+	root := t.TempDir()
+	path := filepath.Join(root, "source.db")
+	db, err := sql.Open("sqlite3", path+"?_busy_timeout=1")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	_, err = db.Exec("CREATE TABLE budget_periods (value TEXT); INSERT INTO budget_periods VALUES ('before')")
+	require.NoError(t, err)
+	bankDir := filepath.Join(root, "bank")
+	err = s.stageSharedVaultWith(context.Background(), bankDir, []byte("passphrase"), func(finalize func() error) error {
+		return database.WithWriteBarrier(context.Background(), path, func() error {
+			require.NoError(t, finalize())
+			_, err := os.Stat(filepath.Join(bankDir, "household.key"))
+			require.NoError(t, err)
+			_, err = db.Exec("UPDATE budget_periods SET value='after'")
+			require.ErrorContains(t, err, "locked")
+			other := newVault(filepath.Dir(s.vault.path), "sandbox", secrets)
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			_, err = other.lock(ctx)
+			require.ErrorIs(t, err, errBusy)
+			return nil
+		})
+	})
+	require.NoError(t, err)
+	_, err = db.Exec("UPDATE budget_periods SET value='after'")
+	require.NoError(t, err)
 }
 
 func TestStageSharedHouseholdCopiesLedgerAndBank(t *testing.T) {

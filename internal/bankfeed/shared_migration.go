@@ -84,9 +84,12 @@ func (s *Service) StageSharedHousehold(ctx context.Context, householdDir, source
 	if !filepath.IsAbs(householdDir) || sourceLedger == "" {
 		return errStorage
 	}
-	return s.stageSharedVaultWith(ctx, filepath.Join(householdDir, "bank"), passphrase, func() error {
+	return s.stageSharedVaultWith(ctx, filepath.Join(householdDir, "bank"), passphrase, func(finalize func() error) error {
 		return database.WithWriteBarrier(ctx, sourceLedger, func() error {
-			return database.CreateSnapshot(ctx, sourceLedger, filepath.Join(householdDir, "finstrel.db"))
+			if err := database.CreateSnapshot(ctx, sourceLedger, filepath.Join(householdDir, "finstrel.db")); err != nil {
+				return err
+			}
+			return finalize()
 		})
 	})
 }
@@ -104,7 +107,7 @@ func (s *Service) PrepareSharedHousehold(ctx context.Context, householdDir, part
 	return s.StageSharedHousehold(ctx, householdDir, sourceLedger, passphrase)
 }
 
-func (s *Service) stageSharedVaultWith(ctx context.Context, dir string, passphrase []byte, stageLedger func() error) error {
+func (s *Service) stageSharedVaultWith(ctx context.Context, dir string, passphrase []byte, stageLedger func(func() error) error) error {
 	if len(passphrase) == 0 || dir == "" {
 		return errStorage
 	}
@@ -196,28 +199,29 @@ func (s *Service) stageSharedVaultWith(ctx context.Context, dir string, passphra
 			return errStorage
 		}
 	}
-	if stageLedger != nil {
-		if err = stageLedger(); err != nil {
+	finalize := func() error {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
+		// Publish the complete envelope last, while both source locks are held.
+		f, err := os.CreateTemp(dir, ".household-key-*")
+		if err != nil {
+			return errStorage
+		}
+		defer os.Remove(f.Name())
+		if _, err = f.Write(envelope); err == nil {
+			err = f.Sync()
+		}
+		if closeErr := f.Close(); err != nil || closeErr != nil {
+			return errStorage
+		}
+		if err = os.Link(f.Name(), filepath.Join(dir, "household.key")); err != nil {
+			return errStorage
+		}
+		return nil
 	}
-	if err = ctx.Err(); err != nil {
-		return err
+	if stageLedger != nil {
+		return stageLedger(finalize)
 	}
-	// Publish the complete envelope last. Its absence identifies an incomplete stage.
-	f, err := os.CreateTemp(dir, ".household-key-*")
-	if err != nil {
-		return errStorage
-	}
-	defer os.Remove(f.Name())
-	if _, err = f.Write(envelope); err == nil {
-		err = f.Sync()
-	}
-	if closeErr := f.Close(); err != nil || closeErr != nil {
-		return errStorage
-	}
-	if err = os.Link(f.Name(), filepath.Join(dir, "household.key")); err != nil {
-		return errStorage
-	}
-	return nil
+	return finalize()
 }
